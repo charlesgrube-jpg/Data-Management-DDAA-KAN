@@ -1,0 +1,34 @@
+# Audio Deepfake Detection Dataset Pipeline
+# Dependencies for the full pipeline
+
+# Core audio processing
+librosa>=0.10.0
+soundfile>=0.12.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Dataset loading
+datasets>=2.14.0
+huggingface_hub>=0.16.0
+
+# Configuration
+pyyaml>=6.0
+
+# Data handling
+pandas>=2.0.0
+
+# Text-to-Speech (TTS)
+TTS>=0.17.0  # Coqui TTS
+
+# Audio augmentation (optional, for advanced effects)
+# audiomentations>=0.30.0
+
+# Progress and utilities
+tqdm>=4.65.0
+
+# Voice Conversion (install separately based on chosen model)
+# For RVC: Follow https://github.com/RVC-Project/Retrieval-based-Voice-Conversion
+# For FreeVC: pip install freevc
+
+# Transcription (optional, Common Voice has transcripts)
+# openai-whisper>=20230314

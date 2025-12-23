@@ -1,0 +1,43 @@
+# Data directories (large, downloaded)
+mozilla_cv_data/
+speech_commands_data/
+test_samples/
+test_samples_cv/
+test_samples_libri/
+test_samples_real/
+
+# Output directories (generated, timestamped)
+processed_dataset/
+processed_dataset_*/
+processed_tts/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.eggs/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.temp
+*.log

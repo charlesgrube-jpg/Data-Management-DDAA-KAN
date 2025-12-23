@@ -1,0 +1,239 @@
+"""
+Mozilla Common Voice Dataset Loader
+
+Loads audio files and metadata from extracted Mozilla Common Voice dataset.
+Designed to work with partial downloads.
+
+Usage:
+    from pipeline.mozilla_cv_loader import load_mozilla_cv
+    
+    for sample in load_mozilla_cv("mozilla_cv_data/extracted/cv-corpus-24.0-2025-12-05/en", config):
+        print(sample["transcript"], sample["speaker_id"])
+"""
+
+import os
+from pathlib import Path
+from typing import Iterator, Dict, Any, Optional
+import pandas as pd
+import numpy as np
+
+from pipeline.config import Config
+
+
+def load_mozilla_cv(
+    dataset_path: str,
+    config: Config,
+    split: str = "train"
+) -> Iterator[Dict[str, Any]]:
+    """
+    Load audio samples from extracted Mozilla Common Voice dataset.
+    
+    Args:
+        dataset_path: Path to extracted CV directory (containing clips/, train.tsv, etc.)
+        config: Pipeline configuration
+        split: Which split to load ("train", "test", "dev", "validated")
+        
+    Yields:
+        Dict with keys: audio, sample_rate, speaker_id, transcript, gender, accent, etc.
+    """
+    dataset_path = Path(dataset_path)
+    clips_dir = dataset_path / "clips"
+    tsv_file = dataset_path / f"{split}.tsv"
+    
+    if not dataset_path.exists():
+        raise FileNotFoundError(f"Dataset not found: {dataset_path}")
+    
+    # Check for combined matched TSV first (best option)
+    all_matched_tsv = dataset_path / "all_matched_clips.tsv"
+    matched_tsv = dataset_path / f"matched_{split}.tsv"
+    
+    if all_matched_tsv.exists():
+        print(f"[Mozilla CV Loader] Using all_matched_clips.tsv")
+        df = pd.read_csv(all_matched_tsv, sep='\t')
+    elif matched_tsv.exists():
+        print(f"[Mozilla CV Loader] Using matched TSV: {matched_tsv}")
+        df = pd.read_csv(matched_tsv, sep='\t')
+    elif tsv_file.exists():
+        # Load metadata and filter by available clips
+        print(f"[Mozilla CV Loader] Loading {split}.tsv and filtering by available clips...")
+        
+        # Get available clips
+        available_clips = set(f.name for f in clips_dir.glob("*.mp3"))
+        print(f"[Mozilla CV Loader] Available clips: {len(available_clips)}")
+        
+        if len(available_clips) == 0:
+            print("[Mozilla CV Loader] WARNING: No clips found in clips/ directory")
+            return
+        
+        # Scan TSV in chunks to find matching entries
+        matches = []
+        for chunk in pd.read_csv(tsv_file, sep='\t', chunksize=100000):
+            matched = chunk[chunk['path'].isin(available_clips)]
+            if len(matched) > 0:
+                matches.append(matched)
+        
+        if matches:
+            df = pd.concat(matches)
+            print(f"[Mozilla CV Loader] Found {len(df)} entries with available clips")
+        else:
+            print(f"[Mozilla CV Loader] No clips found in {split}.tsv, trying other TSVs...")
+            # Try other splits
+            for other_split in ["validated", "test", "dev", "other"]:
+                other_tsv = dataset_path / f"{other_split}.tsv"
+                if other_tsv.exists() and other_split != split:
+                    for chunk in pd.read_csv(other_tsv, sep='\t', chunksize=100000):
+                        matched = chunk[chunk['path'].isin(available_clips)]
+                        if len(matched) > 0:
+                            matches.append(matched)
+                    if matches:
+                        print(f"[Mozilla CV Loader] Found clips in {other_split}.tsv")
+                        break
+            
+            if matches:
+                df = pd.concat(matches)
+            else:
+                print("[Mozilla CV Loader] ERROR: No matching clips found in any TSV")
+                return
+    else:
+        raise FileNotFoundError(f"TSV file not found: {tsv_file}")
+    
+    print(f"[Mozilla CV Loader] Total entries: {len(df)}")
+    
+    # Limit samples if configured
+    if config.source.max_samples:
+        df = df.head(config.source.max_samples)
+        print(f"[Mozilla CV Loader] Limited to {len(df)} samples")
+    
+    # Try to import audio loading libraries
+    try:
+        import librosa
+        use_librosa = True
+    except ImportError:
+        use_librosa = False
+        try:
+            from pydub import AudioSegment
+            use_pydub = True
+        except ImportError:
+            use_pydub = False
+            print("[Mozilla CV Loader] WARNING: Neither librosa nor pydub available")
+            print("                    Install with: pip install librosa")
+    
+    loaded_count = 0
+    skipped_count = 0
+    
+    for idx, row in df.iterrows():
+        # Get clip path
+        clip_filename = row.get('path', '')
+        if not clip_filename:
+            skipped_count += 1
+            continue
+        
+        clip_path = clips_dir / clip_filename
+        
+        # Check if file exists (may not be in partial download)
+        if not clip_path.exists():
+            skipped_count += 1
+            continue
+        
+        try:
+            # Load audio
+            if use_librosa:
+                audio, sr = librosa.load(str(clip_path), sr=config.audio.target_sr)
+            else:
+                # Fallback: just skip if no audio loader
+                skipped_count += 1
+                continue
+            
+            # Build sample dict
+            sample = {
+                "audio": audio,
+                "sample_rate": sr,
+                "source_idx": idx,
+                "speaker_id": str(row.get('client_id', f'speaker_{idx}')),
+                "transcript": str(row.get('sentence', '')),
+                "gender": str(row.get('gender', 'unknown')),
+                "accent": str(row.get('accents', row.get('accent', 'unknown'))),
+                "age": str(row.get('age', 'unknown')),
+                "locale": str(row.get('locale', 'en')),
+                "file_path": str(clip_path),
+                "up_votes": int(row.get('up_votes', 0)),
+                "down_votes": int(row.get('down_votes', 0)),
+            }
+            
+            loaded_count += 1
+            yield sample
+            
+        except Exception as e:
+            print(f"[Mozilla CV Loader] Error loading {clip_filename}: {e}")
+            skipped_count += 1
+            continue
+    
+    print(f"[Mozilla CV Loader] Loaded: {loaded_count}, Skipped: {skipped_count}")
+
+
+def get_available_clips(dataset_path: str) -> list:
+    """
+    Get list of available audio clips in the dataset directory.
+    Useful for checking what was extracted from partial download.
+    """
+    clips_dir = Path(dataset_path) / "clips"
+    
+    if not clips_dir.exists():
+        return []
+    
+    return sorted([f.name for f in clips_dir.glob("*.mp3")])
+
+
+def filter_tsv_by_available_clips(dataset_path: str, split: str = "train") -> pd.DataFrame:
+    """
+    Filter the TSV metadata to only include rows for clips that exist.
+    Useful when working with partial downloads.
+    """
+    dataset_path = Path(dataset_path)
+    tsv_file = dataset_path / f"{split}.tsv"
+    clips_dir = dataset_path / "clips"
+    
+    if not tsv_file.exists():
+        raise FileNotFoundError(f"TSV not found: {tsv_file}")
+    
+    # Load full TSV
+    df = pd.read_csv(tsv_file, sep='\t')
+    
+    # Get available clips
+    available = set(get_available_clips(str(dataset_path)))
+    
+    # Filter
+    df_filtered = df[df['path'].isin(available)]
+    
+    print(f"[Mozilla CV Loader] Filtered {split}.tsv: {len(df_filtered)}/{len(df)} entries have clips")
+    
+    return df_filtered
+
+
+if __name__ == "__main__":
+    # Test the loader
+    from pipeline.config import load_config
+    
+    cfg = load_config("config.yaml")
+    
+    cv_path = Path("mozilla_cv_data/extracted/cv-corpus-24.0-2025-12-05/en")
+    
+    if cv_path.exists():
+        # Check what clips we have
+        clips = get_available_clips(str(cv_path))
+        print(f"Available clips: {len(clips)}")
+        
+        # Filter TSV
+        df = filter_tsv_by_available_clips(str(cv_path), "train")
+        print(f"\nSample metadata:")
+        print(df[['path', 'sentence', 'client_id', 'gender']].head())
+        
+        # Test loading
+        print("\nLoading samples...")
+        for i, sample in enumerate(load_mozilla_cv(str(cv_path), cfg)):
+            print(f"  {i}: {sample['transcript'][:50]}... ({len(sample['audio'])/sample['sample_rate']:.2f}s)")
+            if i >= 4:
+                break
+    else:
+        print(f"Dataset not found at {cv_path}")
+        print("Run download_partial.py first")

@@ -1,0 +1,70 @@
+# ============================================================
+# Dataset Pipeline Configuration
+# ============================================================
+# All parameters centralized here. Set seed for reproducibility.
+
+# --- Dataset Source ---
+source:
+  dataset_name: "mozilla-foundation/common_voice_13_0"
+  language: "en"
+  split: "train"
+  max_samples: 100  # Start small for testing! Set to null for full dataset
+  cache_dir: "./cache"
+  streaming: true   # Stream data to avoid downloading 80GB+
+
+# --- Audio Processing ---
+audio:
+  target_sr: 16000           # Sample rate in Hz
+  normalize_db: -20          # RMS normalization target (dBFS)
+  silence_threshold_db: 40   # For trimming (higher = more aggressive)
+  min_duration: 1.0          # Minimum chunk duration (seconds)
+  max_duration: 10.0         # Maximum source audio duration (skip longer)
+
+# --- Segmentation ---
+segmentation:
+  chunk_duration: 3.0        # Target chunk duration (seconds)
+  overlap: 0.0               # Overlap ratio (0.0 = no overlap)
+  pad_last_chunk: true       # Pad if last chunk is shorter
+
+# --- Synthesis ---
+synthesis:
+  tts_models:
+    - "tts_models/en/ljspeech/tacotron2-DDC"
+    - "tts_models/en/vctk/vits"
+  vc_models:
+    - "rvc"
+  pick_strategy: "random"    # "random", "both", "tts_only", "vc_only"
+  fallback_on_error: true    # Skip sample if synthesis fails
+
+# --- Channel Effects ---
+effects:
+  enabled: true
+  quality_distribution:
+    clean: 0.40              # No degradation
+    mobile: 0.40             # Light compression + mild noise
+    noisy: 0.20              # Background noise + reverb
+  apply_same_to_pair: true   # Same effect tier to real + synthetic
+
+# --- Data Splits ---
+splits:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+
+# --- Output ---
+output:
+  base_dir: "./processed_dataset"
+  audio_format: "wav"
+  metadata_file: "metadata.csv"
+  save_transcripts: true
+
+# --- Reproducibility ---
+seed: 42                     # Set to null for random
+
+# --- Validation ---
+validation:
+  check_balance: true
+  balance_tolerance: 0.05    # Allow 45-55% instead of strict 50%
+  check_duplicates: true
+  check_speaker_leakage: true
+  min_samples_per_split: 100
