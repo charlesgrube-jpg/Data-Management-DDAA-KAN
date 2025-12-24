@@ -7,8 +7,8 @@
 source:
   dataset_name: "mozilla-foundation/common_voice_13_0"
   language: "en"
-  split: "train"
-  max_samples: 100  # Start small for testing! Set to null for full dataset
+  split: "train"  # Use train.tsv
+  max_samples: 50  # Use up to 50 of the 67 available clips
   cache_dir: "./cache"
   streaming: true   # Stream data to avoid downloading 80GB+
 
@@ -28,13 +28,11 @@ segmentation:
 
 # --- Synthesis ---
 synthesis:
-  tts_models:
-    - "tts_models/en/ljspeech/tacotron2-DDC"
-    - "tts_models/en/vctk/vits"
-  vc_models:
-    - "rvc"
-  pick_strategy: "random"    # "random", "both", "tts_only", "vc_only"
-  fallback_on_error: true    # Skip sample if synthesis fails
+  tts_models: []              # Empty = use gTTS fallback (no DLL issues)
+  vc_models: []               # Empty = skip RVC
+  vc_device: "cpu"
+  pick_strategy: "tts_only"   # Use TTS only
+  fallback_on_error: true
 
 # --- Channel Effects ---
 effects:
@@ -44,6 +42,18 @@ effects:
     mobile: 0.40             # Light compression + mild noise
     noisy: 0.20              # Background noise + reverb
   apply_same_to_pair: true   # Same effect tier to real + synthetic
+
+# --- Codec Compression ---
+codec_compression:
+  enabled: false  # Disabled due to ffmpeg DLL conflicts
+  apply_to: "all"            # "all", "synthetic_only", "none"
+  codec_distribution:
+    none: 0.30               # No codec compression (30%)
+    mp3_64k: 0.20            # Voice message quality (20%)
+    opus_48k: 0.20           # VoIP quality - WhatsApp, Discord (20%)
+    aac_96k: 0.15            # Medium streaming quality (15%)
+    aac_128k: 0.15           # High streaming - YouTube, social (15%)
+  apply_after_effects: true  # Apply codec after channel effects
 
 # --- Data Splits ---
 splits:
@@ -64,7 +74,7 @@ seed: 42                     # Set to null for random
 # --- Validation ---
 validation:
   check_balance: true
-  balance_tolerance: 0.05    # Allow 45-55% instead of strict 50%
-  check_duplicates: true
+  balance_tolerance: 0.10    # Allow 40-60% for small datasets
+  check_duplicates: false    # Disabled: real+synthetic pairs share same base
   check_speaker_leakage: true
-  min_samples_per_split: 100
+  min_samples_per_split: 10  # Lowered for small test dataset

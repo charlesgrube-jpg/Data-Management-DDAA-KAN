@@ -100,11 +100,15 @@ class VCSynthesizer(BaseSynthesizer):
     def _load_model(self):
         """Lazy load VC model."""
         if self._model is None:
-            # TODO: Implement actual VC model loading
-            # This is a placeholder - real implementation depends on chosen VC library
-            print(f"[VC] WARNING: VC model {self.model_name} not implemented yet")
-            print(f"[VC] Using pitch-shift placeholder for development")
-            self._available = True  # Use placeholder
+            try:
+                # Check if rvc-python is available
+                from rvc_python.infer import RVCInference
+                print(f"[VC] RVC available, will use model: {self.model_name}")
+                self._available = True
+            except ImportError:
+                print(f"[VC] WARNING: rvc-python not installed")
+                print(f"[VC] Install with: pip install rvc-python")
+                self._available = False
     
     def is_available(self) -> bool:
         if self._available is None:
@@ -123,7 +127,7 @@ class VCSynthesizer(BaseSynthesizer):
         Args:
             audio: Input audio array
             sr: Sample rate
-            target_voice: Target voice/speaker ID
+            target_voice: Target voice/speaker ID (model path for RVC)
             
         Returns:
             Converted audio array or None if failed
@@ -134,13 +138,18 @@ class VCSynthesizer(BaseSynthesizer):
             return None
         
         try:
-            # PLACEHOLDER: Simple pitch shift as stand-in for real VC
-            # Replace with actual RVC/FreeVC implementation
-            import librosa
+            # Use RVC for voice conversion
+            from pipeline.synthesizer.rvc_synthesizer import synthesize_vc
             
-            # Random pitch shift to simulate voice conversion
-            n_steps = random.choice([-3, -2, 2, 3])  # Semitones
-            converted = librosa.effects.pitch_shift(audio, sr=sr, n_steps=n_steps)
+            # Use model_name as default path if target_voice not specified
+            model_path = target_voice or self.model_name
+            
+            converted = synthesize_vc(
+                audio=audio,
+                sr=sr,
+                model_path=model_path,
+                device=self.device
+            )
             
             return converted
         except Exception as e:
@@ -203,16 +212,49 @@ class SynthesizerManager:
         vc_result = None
         
         # TTS synthesis
-        if strategy in ["random", "both", "tts_only"] and self.tts_synthesizers:
-            synth = random.choice(self.tts_synthesizers)
-            tts_audio = synth.synthesize(transcript)
+        if strategy in ["random", "both", "tts_only"]:
+            if self.tts_synthesizers:
+                # Use Coqui TTS if available
+                synth = random.choice(self.tts_synthesizers)
+                tts_audio = synth.synthesize(transcript)
+                
+                if tts_audio is not None:
+                    tts_result = {
+                        "audio": tts_audio,
+                        "generator": synth.model_name,
+                        "method": "tts"
+                    }
             
-            if tts_audio is not None:
-                tts_result = {
-                    "audio": tts_audio,
-                    "generator": synth.model_name,
-                    "method": "tts"
-                }
+            # Try edge-tts first (pure Python, no DLL issues)
+            if tts_result is None:
+                try:
+                    from pipeline.synthesizer.edge_tts_synthesizer import synthesize_edge_tts, EDGE_TTS_VOICES
+                    import random as rand
+                    voice = rand.choice(EDGE_TTS_VOICES)
+                    edge_audio = synthesize_edge_tts(transcript, voice=voice, sample_rate=sr)
+                    if edge_audio is not None:
+                        tts_result = {
+                            "audio": edge_audio,
+                            "generator": f"edge-tts/{voice}",
+                            "method": "tts"
+                        }
+                except Exception as e:
+                    print(f"[Synthesizer] Edge-TTS failed: {e}")
+            
+            # Fallback to gTTS if edge-tts failed
+            if tts_result is None:
+                try:
+                    from pipeline.synthesizer.gtts_synthesizer import synthesize_tts
+                    gtts_audio = synthesize_tts(transcript, sample_rate=sr)
+                    if gtts_audio is not None:
+                        import gtts
+                        tts_result = {
+                            "audio": gtts_audio,
+                            "generator": f"gTTS-{gtts.__version__}",
+                            "method": "tts"
+                        }
+                except Exception as e:
+                    print(f"[Synthesizer] gTTS fallback failed: {e}")
         
         # VC synthesis
         if strategy in ["random", "both", "vc_only"] and self.vc_synthesizers:

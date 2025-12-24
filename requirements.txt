@@ -1,34 +1,34 @@
 # Audio Deepfake Detection Dataset Pipeline
-# Dependencies for the full pipeline
+# Dependencies - Clean, minimal setup
 
 # Core audio processing
 librosa>=0.10.0
 soundfile>=0.12.0
-numpy>=1.24.0
+numpy>=1.22.0
 scipy>=1.10.0
-
-# Dataset loading
-datasets>=2.14.0
-huggingface_hub>=0.16.0
 
 # Configuration
 pyyaml>=6.0
 
 # Data handling
-pandas>=2.0.0
+pandas>=1.5.0
 
-# Text-to-Speech (TTS)
-TTS>=0.17.0  # Coqui TTS
+# Text-to-Speech
+edge-tts>=7.0.0        # Microsoft Neural TTS (primary, high quality)
+gTTS>=2.5.0            # Google TTS (fallback)
 
-# Audio augmentation (optional, for advanced effects)
-# audiomentations>=0.30.0
+# Audio effects
+pydub>=0.25.0          # For codec compression (requires ffmpeg)
 
-# Progress and utilities
+# Progress
 tqdm>=4.65.0
 
-# Voice Conversion (install separately based on chosen model)
-# For RVC: Follow https://github.com/RVC-Project/Retrieval-based-Voice-Conversion
-# For FreeVC: pip install freevc
+# Optional - Voice Conversion (requires Docker/Linux due to DLL conflicts on Windows)
+# rvc-python>=0.1.0    # Uncomment in Docker environment
+# TTS>=0.17.0          # Coqui TTS - uncomment in Docker environment
 
-# Transcription (optional, Common Voice has transcripts)
-# openai-whisper>=20230314
+# System Requirements:
+# - ffmpeg: Required for codec compression
+#   Linux: apt install ffmpeg
+#   macOS: brew install ffmpeg
+#   Windows: Download from https://ffmpeg.org/download.html

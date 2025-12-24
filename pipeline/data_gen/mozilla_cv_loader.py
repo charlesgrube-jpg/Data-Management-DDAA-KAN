@@ -57,9 +57,13 @@ def load_mozilla_cv(
         # Load metadata and filter by available clips
         print(f"[Mozilla CV Loader] Loading {split}.tsv and filtering by available clips...")
         
-        # Get available clips
+        # Get available clips (support both mp3 and wav)
         available_clips = set(f.name for f in clips_dir.glob("*.mp3"))
-        print(f"[Mozilla CV Loader] Available clips: {len(available_clips)}")
+        available_clips.update(f.name for f in clips_dir.glob("*.wav"))
+        # Also add with clips/ prefix for matching TSV entries
+        available_clips_with_prefix = set(f"clips/{name}" for name in available_clips)
+        available_clips.update(available_clips_with_prefix)
+        print(f"[Mozilla CV Loader] Available clips: {len(available_clips) // 2}")
         
         if len(available_clips) == 0:
             print("[Mozilla CV Loader] WARNING: No clips found in clips/ directory")
@@ -75,6 +79,7 @@ def load_mozilla_cv(
         if matches:
             df = pd.concat(matches)
             print(f"[Mozilla CV Loader] Found {len(df)} entries with available clips")
+
         else:
             print(f"[Mozilla CV Loader] No clips found in {split}.tsv, trying other TSVs...")
             # Try other splits
@@ -127,6 +132,10 @@ def load_mozilla_cv(
         if not clip_filename:
             skipped_count += 1
             continue
+        
+        # Strip 'clips/' prefix if present (TSV may have paths like 'clips/file.mp3')
+        if clip_filename.startswith('clips/'):
+            clip_filename = clip_filename[6:]  # Remove 'clips/' prefix
         
         clip_path = clips_dir / clip_filename
         
@@ -181,7 +190,11 @@ def get_available_clips(dataset_path: str) -> list:
     if not clips_dir.exists():
         return []
     
-    return sorted([f.name for f in clips_dir.glob("*.mp3")])
+    # Support both mp3 and wav files
+    clips = [f.name for f in clips_dir.glob("*.mp3")]
+    clips.extend([f.name for f in clips_dir.glob("*.wav")])
+    return sorted(clips)
+
 
 
 def filter_tsv_by_available_clips(dataset_path: str, split: str = "train") -> pd.DataFrame:

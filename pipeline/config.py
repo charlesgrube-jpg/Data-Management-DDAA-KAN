@@ -45,6 +45,7 @@ class SynthesisConfig:
     vc_models: List[str]
     pick_strategy: str  # "random", "both", "tts_only", "vc_only"
     fallback_on_error: bool
+    vc_device: str = "cpu"  # Device for VC: "cpu" or "cuda:0"
 
 
 @dataclass
@@ -52,6 +53,14 @@ class EffectsConfig:
     enabled: bool
     quality_distribution: Dict[str, float]
     apply_same_to_pair: bool
+
+
+@dataclass
+class CodecCompressionConfig:
+    enabled: bool
+    apply_to: str  # "all", "synthetic_only", "none"
+    codec_distribution: Dict[str, float]
+    apply_after_effects: bool
 
 
 @dataclass
@@ -86,6 +95,7 @@ class Config:
     segmentation: SegmentationConfig
     synthesis: SynthesisConfig
     effects: EffectsConfig
+    codec_compression: CodecCompressionConfig
     splits: SplitsConfig
     output: OutputConfig
     validation: ValidationConfig
@@ -129,6 +139,7 @@ def load_config(config_path: str = "config.yaml") -> Config:
         segmentation=SegmentationConfig(**raw['segmentation']),
         synthesis=SynthesisConfig(**raw['synthesis']),
         effects=EffectsConfig(**raw['effects']),
+        codec_compression=CodecCompressionConfig(**raw['codec_compression']),
         splits=SplitsConfig(**raw['splits']),
         output=OutputConfig(**raw['output']),
         validation=ValidationConfig(**raw['validation']),

@@ -14,6 +14,7 @@ import numpy as np
 import random
 from typing import Tuple
 from pipeline.config import Config
+from pipeline.effects.codec_compression import apply_codec_if_enabled
 
 
 def apply_effects(
@@ -198,11 +199,12 @@ def apply_effects_to_pair(
     synthetic_audio: np.ndarray,
     sr: int,
     config: Config
-) -> Tuple[np.ndarray, np.ndarray, str]:
+) -> Tuple[np.ndarray, np.ndarray, str, str]:
     """
     Apply same effects to both real and synthetic audio.
     
     Critical for fairness: both samples get identical degradation.
+    Applies channel effects first, then codec compression.
     
     Args:
         real_audio: Real audio array
@@ -211,29 +213,57 @@ def apply_effects_to_pair(
         config: Pipeline configuration
         
     Returns:
-        Tuple of (processed_real, processed_synthetic, quality_tier)
+        Tuple of (processed_real, processed_synthetic, quality_tier, codec_tier)
     """
     if not config.effects.enabled:
-        return real_audio, synthetic_audio, "clean"
-    
-    # Select quality tier
-    tier = select_quality_tier(config)
-    
-    if config.effects.apply_same_to_pair:
-        # Apply exact same effects (important for fairness)
-        # Use same random seed for both
-        state = np.random.get_state()
-        
-        real_processed = apply_effects(real_audio, sr, tier)
-        
-        np.random.set_state(state)  # Reset to same state
-        synthetic_processed = apply_effects(synthetic_audio, sr, tier)
+        quality_tier = "clean"
+        real_processed = real_audio
+        synthetic_processed = synthetic_audio
     else:
-        # Independent effects (not recommended)
-        real_processed = apply_effects(real_audio, sr, tier)
-        synthetic_processed = apply_effects(synthetic_audio, sr, tier)
+        # Select quality tier
+        quality_tier = select_quality_tier(config)
+        
+        if config.effects.apply_same_to_pair:
+            # Apply exact same effects (important for fairness)
+            # Use same random seed for both
+            state = np.random.get_state()
+            
+            real_processed = apply_effects(real_audio, sr, quality_tier)
+            
+            np.random.set_state(state)  # Reset to same state
+            synthetic_processed = apply_effects(synthetic_audio, sr, quality_tier)
+        else:
+            # Independent effects (not recommended)
+            real_processed = apply_effects(real_audio, sr, quality_tier)
+            synthetic_processed = apply_effects(synthetic_audio, sr, quality_tier)
     
-    return real_processed, synthetic_processed, tier
+    # Apply codec compression if enabled (after channel effects)
+    codec_tier = "none"
+    if hasattr(config, 'codec_compression') and config.codec_compression.enabled:
+        if config.codec_compression.apply_after_effects:
+            # Apply same codec to both (for fairness)
+            from pipeline.effects.codec_compression import select_codec_tier, parse_codec_tier, apply_codec_compression
+            
+            codec_tier = select_codec_tier(config)
+            
+            if codec_tier != "none":
+                codec, bitrate = parse_codec_tier(codec_tier)
+                
+                if codec is not None:
+                    # Save random state to ensure both get same codec artifacts
+                    state = np.random.get_state()
+                    
+                    real_compressed = apply_codec_compression(real_processed, sr, codec, bitrate)
+                    if real_compressed is not None:
+                        real_processed = real_compressed
+                    
+                    np.random.set_state(state)
+                    
+                    synthetic_compressed = apply_codec_compression(synthetic_processed, sr, codec, bitrate)
+                    if synthetic_compressed is not None:
+                        synthetic_processed = synthetic_compressed
+    
+    return real_processed, synthetic_processed, quality_tier, codec_tier
 
 
 if __name__ == "__main__":
