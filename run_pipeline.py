@@ -44,7 +44,10 @@ def run_mozilla_cv_pipeline():
     config.output.base_dir = str(output_path)
     
     # Path to extracted Mozilla CV data
-    cv_path = Path("mozilla_cv_data/cv-corpus-24.0-2025-12-05/en")
+    # Use config path if available, otherwise default (compatibility)
+    default_path = "mozilla_cv_data/cv-corpus-24.0-2025-12-05/en"
+    cv_path_str = getattr(config.source, "data_path", default_path)
+    cv_path = Path(cv_path_str)
     
     if not cv_path.exists():
         print(f"\n[ERROR] Mozilla CV data not found at {cv_path}")

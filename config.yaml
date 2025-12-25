@@ -11,6 +11,7 @@ source:
   max_samples: 50  # Use up to 50 of the 67 available clips
   cache_dir: "./cache"
   streaming: true   # Stream data to avoid downloading 80GB+
+  data_path: "mozilla_cv_data/cv-corpus-24.0-2025-12-05/en" # Default path, override in Colab
 
 # --- Audio Processing ---
 audio:
