@@ -206,7 +206,7 @@ def check_audio_integrity(samples: List[Dict[str, Any]]) -> Dict[str, Any]:
         "passed": len(issues) == 0,
         "num_issues": len(issues),
         "issue_types": list(set(i["issue"] for i in issues)),
-        "details": issues[:10] if len(issues) > 10 else issues  # Limit output
+        "issues": issues[:10] if len(issues) > 10 else issues  # Limit output
     }
 
 
