@@ -203,9 +203,9 @@ def main():
     
     print(f"      Token: {str(download_token)[:50]}...")
     
-    # Step 2: Download (1GB sample)
+    # Step 2: Download (Full dataset)
     output_path = output_dir / "common_voice_sample.tar.gz"
-    max_bytes = 1 * 1024 * 1024 * 1024  # 1 GB
+    max_bytes = None  # Download full dataset (no limit)
     
     success = download_with_token(download_token, str(output_path), max_bytes)
     
