@@ -15,7 +15,7 @@ processed_tts/
 # Model files (downloaded, large)
 rvc_models/
 *.pth
-*.pt
+# Note: .pt files (PyTorch tensors) not ignored - needed for feature outputs
 
 # Python
 __pycache__/
@@ -48,5 +48,5 @@ Thumbs.db
 *.temp
 *.log
 
-# Notebooks (scratch work)
-*.ipynb
+# Feature output directories (generated)
+features_*/

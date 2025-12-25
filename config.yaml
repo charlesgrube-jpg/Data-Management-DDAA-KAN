@@ -45,7 +45,7 @@ effects:
 
 # --- Codec Compression ---
 codec_compression:
-  enabled: false  # Disabled due to ffmpeg DLL conflicts
+  enabled: true  # Enabled: will skip gracefully if ffmpeg not found locally
   apply_to: "all"            # "all", "synthetic_only", "none"
   codec_distribution:
     none: 0.30               # No codec compression (30%)
@@ -78,3 +78,18 @@ validation:
   check_duplicates: false    # Disabled: real+synthetic pairs share same base
   check_speaker_leakage: true
   min_samples_per_split: 10  # Lowered for small test dataset
+
+# --- Feature Extraction ---
+features:
+  type: "cqt"                # "cqt" or "lfcc"
+  device: "auto"             # "auto", "cpu", or "cuda"
+  output_format: "pt"        # "pt" (PyTorch) or "npy" (NumPy)
+  cqt:
+    n_bins: 84               # 7 octaves
+    hop_length: 512
+    fmin: 32.7               # C1
+  lfcc:
+    n_lfcc: 60
+    n_filters: 128
+    n_fft: 512
+    hop_length: 256

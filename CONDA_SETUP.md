@@ -1,9 +1,9 @@
 # Environment Setup
 
-## Quick Start (Recommended)
+## Quick Start
 
 ```bash
-# Create clean environment
+# Create environment
 conda create -n ddaa-clean python=3.10 -y
 conda activate ddaa-clean
 
@@ -12,6 +12,9 @@ pip install -r requirements.txt
 
 # Run pipeline
 python run_pipeline.py
+
+# Extract features
+python -m pipeline.features.extract_features --type cqt
 ```
 
 ## Verify Installation
@@ -19,28 +22,20 @@ python run_pipeline.py
 ```bash
 python -c "import edge_tts; print('edge-tts OK')"
 python -c "import librosa; print('librosa OK')"
-python -c "import soundfile; print('soundfile OK')"
+python -c "import torchaudio; print('torchaudio OK')"
 ```
 
-## Optional: FFmpeg for Codec Compression
+## Google Colab
 
-To enable codec compression (MP3/AAC artifacts):
+For full pipeline (RVC, Coqui, GPU features), use Google Colab:
+1. Upload `DDAA_Pipeline_Colab.ipynb`
+2. Uses `requirements_colab.txt` automatically
 
-**Linux:**
-```bash
-apt install ffmpeg
-```
+## requirements.txt vs requirements_colab.txt
 
-**macOS:**
-```bash
-brew install ffmpeg
-```
+| File | Platform | Includes |
+|------|----------|----------|
+| `requirements.txt` | Windows/Mac | Edge-TTS, gTTS, librosa |
+| `requirements_colab.txt` | Linux/Colab | + RVC, Coqui TTS, nnAudio (GPU) |
 
-**Windows:**
-Download from https://ffmpeg.org/download.html and add to PATH.
-
-## Notes
-
-- Python 3.10 recommended
-- RVC/Coqui TTS require Docker or Linux (Windows has DLL conflicts)
-- See `PIPELINE_SUMMARY.md` for full details
+Windows has DLL conflicts with RVC/Coqui. Use Colab for full synthesis.

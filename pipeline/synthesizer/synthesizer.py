@@ -268,6 +268,25 @@ class SynthesizerManager:
                     "method": "vc"
                 }
         
+        # Normalization (Crucial for fairness with real audio)
+        from pipeline.standardizer.preprocessor import rms_normalize, trim_silence
+        
+        # Normalize TTS result
+        if tts_result is not None:
+            # Trim silence
+            audio, _ = trim_silence(tts_result["audio"], self.config.audio.silence_threshold_db)
+            # RMS Normalize
+            audio = rms_normalize(audio, self.config.audio.normalize_db)
+            tts_result["audio"] = audio
+            
+        # Normalize VC result
+        if vc_result is not None:
+             # Trim silence
+            audio, _ = trim_silence(vc_result["audio"], self.config.audio.silence_threshold_db)
+            # RMS Normalize
+            audio = rms_normalize(audio, self.config.audio.normalize_db)
+            vc_result["audio"] = audio
+        
         return tts_result, vc_result
     
     def pick_synthetic(
