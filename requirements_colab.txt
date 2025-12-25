@@ -13,7 +13,7 @@ tqdm>=4.65.0
 # Synthesis (Linux-only friendly)
 edge-tts>=6.1.9
 gTTS>=2.5.0
-# rvc-python>=0.1.0    # Incompatible with Colab Python 3.12 (Requires <3.12)
+rvc-python @ git+https://github.com/MisileLab/rvc-python-butter.git    # Patched for Colab Python 3.12
 # TTS>=0.22.0          # Coqui TTS (Causes install failures on Colab Py3.10+)
 
 # Fixes for Colab
