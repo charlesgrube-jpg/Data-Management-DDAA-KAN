@@ -18,8 +18,15 @@ from typing import Optional
 import random
 
 
+# Global variable to cache ffmpeg availability
+_FFMPEG_AVAILABLE = None
+
 def is_ffmpeg_available() -> bool:
     """Check if ffmpeg is available on the system."""
+    global _FFMPEG_AVAILABLE
+    if _FFMPEG_AVAILABLE is not None:
+        return _FFMPEG_AVAILABLE
+
     try:
         import subprocess
         result = subprocess.run(
@@ -27,9 +34,11 @@ def is_ffmpeg_available() -> bool:
             capture_output=True,
             timeout=5
         )
-        return result.returncode == 0
+        _FFMPEG_AVAILABLE = (result.returncode == 0)
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+        _FFMPEG_AVAILABLE = False
+    
+    return _FFMPEG_AVAILABLE
 
 
 def apply_codec_compression(
