@@ -14,7 +14,7 @@ tqdm>=4.65.0
 edge-tts>=6.1.9
 gTTS>=2.5.0
 rvc-python>=0.1.0    # Works on Linux!
-TTS>=0.22.0          # Works on Linux!
+# TTS>=0.22.0          # Coqui TTS (Causes install failures on Colab Py3.10+)
 
 # Fixes for Colab
 ffmpeg-python
