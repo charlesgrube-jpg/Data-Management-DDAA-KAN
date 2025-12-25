@@ -13,7 +13,16 @@ tqdm>=4.65.0
 # Synthesis (Linux-only friendly)
 edge-tts>=6.1.9
 gTTS>=2.5.0
-rvc-python-butter @ git+https://github.com/MisileLab/rvc-python-butter.git    # Patched for Colab Python 3.12
+# RVC Dependencies (Manual list to avoid Fairseq/Hydra conflict)
+hydra-core>=1.1
+omegaconf>=2.1
+faiss-cpu==1.8.0
+torchcrepe
+ffmpeg-python
+av
+loguru
+praat-parselmouth
+pyworld
 # TTS>=0.22.0          # Coqui TTS (Causes install failures on Colab Py3.10+)
 
 # Fixes for Colab
