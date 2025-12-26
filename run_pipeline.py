@@ -79,7 +79,15 @@ def run_mozilla_cv_pipeline():
     source_count = 0
     skip_count = 0
     
-    for sample in load_mozilla_cv(str(cv_path), config, split=config.source.split):
+    # Initialize progress bar
+    from tqdm import tqdm
+    total_samples = config.source.max_samples if config.source.max_samples else len(available_clips)
+    
+    # Create the generator
+    loader_gen = load_mozilla_cv(str(cv_path), config, split=config.source.split)
+    
+    # Wrap in tqdm
+    for sample in tqdm(loader_gen, total=total_samples, desc="Processing Samples", unit="sample"):
         source_count += 1
         
         # Phase 2: Preprocess
