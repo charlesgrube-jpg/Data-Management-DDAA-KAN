@@ -33,7 +33,7 @@ synthesis:
   vc_models: []               # Empty = skip RVC
   vc_device: "cpu"
   pick_strategy: "tts_only"   # Use TTS only
-  fallback_on_error: true
+  fallback_on_error: false
 
 # --- Channel Effects ---
 effects:
