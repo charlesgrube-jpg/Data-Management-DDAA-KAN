@@ -57,3 +57,18 @@ python -m pipeline.features.extract_features --type cqt
 **Key Differences:**
 - `requirements.txt`: Minimal, avoids DLL conflicts on Windows
 - `requirements_colab.txt`: Includes `rvc-python`, `TTS`, `nnAudio` (Linux-only)
+
+---
+
+## ⚠️ Important Colab Notes (Python 3.12)
+
+Due to incompatibilities between `fairseq` (required by RVC) and Python 3.12, standard `pip install` may fail.
+If RVC models fail to load, use this manual installation snippet in a Colab cell:
+
+```python
+# Nuclear Option for RVC/Fairseq on Python 3.12
+!pip uninstall -y fairseq rvc-python
+!git clone https://github.com/facebookresearch/fairseq.git
+!cd fairseq && pip install --no-deps .
+!pip install --no-deps rvc-python
+```
