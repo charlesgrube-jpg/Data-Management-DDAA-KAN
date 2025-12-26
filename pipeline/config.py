@@ -19,6 +19,7 @@ class SourceConfig:
     language: str
     split: str
     max_samples: Optional[int]
+    max_size_mb: Optional[float] = None # Limit by total audio size in MB
     cache_dir: str
     streaming: bool = True  # Stream to avoid downloading entire dataset
     data_path: Optional[str] = None # Custom path for data (e.g. for Colab)

@@ -233,17 +233,29 @@ def run_mozilla_cv_pipeline():
     export_stats = export_dataset(working_set, config)
     
     # ============== DONE ==============
+    # ============== DONE ==============
     elapsed = time.time() - start_time
+    total_mb_processed = sum(s.get('original_size', 0) for s in processed_samples) / 1024 / 1024
+    throughput = total_mb_processed / elapsed if elapsed > 0 else 0
+    
+    # Estimate for 3.5 GB (Common Voice English partial)
+    target_size_mb = 3584 # 3.5 GB
+    estimated_seconds = (target_size_mb / throughput) if throughput > 0 else 0
+    estimated_hours = estimated_seconds / 3600
     
     print("\n" + "=" * 60)
     print("MOZILLA CV PIPELINE COMPLETE!")
     print("=" * 60)
     print(f"Time: {elapsed:.1f} seconds")
+    print(f"Throughput: {throughput:.2f} MB/s")
+    if throughput > 0:
+        print(f"📉 ESTIMATED TIME for 3.5GB Dataset: {estimated_hours:.2f} hours")
+        
     print(f"Output: {config.output.base_dir}")
-    print(f"Total samples: {export_stats['total']}")
-    print(f"  Train: {export_stats['train']}")
-    print(f"  Val: {export_stats['val']}")
-    print(f"  Test: {export_stats['test']}")
+    print(f"Total samples: {len(processed_samples)}")
+    print(f"  Train: {len(train_metadata)}")
+    print(f"  Val: {len(val_metadata)}")
+    print(f"  Test: {len(test_metadata)}")
     
     return True
 

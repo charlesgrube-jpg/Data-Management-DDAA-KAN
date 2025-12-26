@@ -125,8 +125,18 @@ def load_mozilla_cv(
     
     loaded_count = 0
     skipped_count = 0
+    total_bytes_loaded = 0
+    max_bytes = config.source.max_size_mb * 1024 * 1024 if config.source.max_size_mb else None
     
+    if max_bytes:
+        print(f"[Mozilla CV Loader] Size limit enabled: {config.source.max_size_mb} MB")
+
     for idx, row in df.iterrows():
+        # Check size limit before processing
+        if max_bytes and total_bytes_loaded >= max_bytes:
+            print(f"[Mozilla CV Loader] Reached size limit of {config.source.max_size_mb} MB. Stopping.")
+            break
+            
         # Get clip path
         clip_filename = row.get('path', '')
         if not clip_filename:
@@ -143,6 +153,13 @@ def load_mozilla_cv(
         if not clip_path.exists():
             skipped_count += 1
             continue
+            
+        # Accumulate size
+        try:
+            file_size = clip_path.stat().st_size
+            total_bytes_loaded += file_size
+        except:
+             pass # Failed to get size, ignore
         
         try:
             # Load audio
@@ -165,6 +182,7 @@ def load_mozilla_cv(
                 "age": str(row.get('age', 'unknown')),
                 "locale": str(row.get('locale', 'en')),
                 "file_path": str(clip_path),
+                "original_size": file_size, # Helpful for tracking
                 "up_votes": int(row.get('up_votes', 0)),
                 "down_votes": int(row.get('down_votes', 0)),
             }
@@ -177,7 +195,7 @@ def load_mozilla_cv(
             skipped_count += 1
             continue
     
-    print(f"[Mozilla CV Loader] Loaded: {loaded_count}, Skipped: {skipped_count}")
+    print(f"[Mozilla CV Loader] Loaded: {loaded_count}, Skipped: {skipped_count}, Total Size: {total_bytes_loaded / 1024 / 1024:.2f} MB")
 
 
 def get_available_clips(dataset_path: str) -> list:
