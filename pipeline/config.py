@@ -21,6 +21,7 @@ class SourceConfig:
     max_samples: Optional[int]
     cache_dir: str
     streaming: bool = True  # Stream to avoid downloading entire dataset
+    data_path: Optional[str] = None # Custom path for data (e.g. for Colab)
 
 
 @dataclass
