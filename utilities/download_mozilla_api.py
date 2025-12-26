@@ -13,16 +13,21 @@ import urllib.request
 from pathlib import Path
 
 
-# API Configuration
-API_KEY = "76224e89f20202746b3df283183916b676c25936608c9fd57546c5d4aae5d616"
-CLIENT_ID = "mdc_e271ec33f12df105e4210e9d0dde9458"
+# API Configuration - CREDENTIALS REQUESTED AT RUNTIME
+API_KEY = ""
+CLIENT_ID = "mdc_e271ec33f12df105e4210e9d0dde9458" # Default client ID often works
+DOWNLOAD_TOKEN = ""
 
-# Common Voice Scripted Speech 24.0 - English (87.74 GB)
-DATASET_ID = "cmj8u3p1w0075nxxbe8bedl00"  # Note: ends with l00 not 100
+# Common Voice Scripted Speech 24.0 - English
+DATASET_ID = "cmj8u3p1w0075nxxbe8bedl00"
 API_BASE = "https://datacollective.mozillafoundation.org/api/datasets"
 
-# Current download token (expires 2025-12-24)
-DOWNLOAD_TOKEN = "dlt_92636c20-bbf1-45be-9ca0-c9239ebfd255"
+def get_credentials():
+    global API_KEY, DOWNLOAD_TOKEN
+    print("\n🔐 Mozilla Data Collective Credentials Required")
+    API_KEY = input("Enter your Bearer Token (API Key): ").strip()
+    DOWNLOAD_TOKEN = input("Enter your Download Token (dlt_...): ").strip()
+    print("------------------------------------------------")
 
 
 def test_api_connection():
@@ -164,8 +169,12 @@ def main():
     print("=" * 60)
     print("MOZILLA DATA COLLECTIVE API DOWNLOAD")
     print("=" * 60)
+    
+    # Get interactive credentials
+    get_credentials()
+    
     print(f"Dataset ID: {DATASET_ID}")
-    print(f"API Key: {API_KEY[:20]}...")
+    print(f"API Key: {API_KEY[:20]}..." if API_KEY else "API Key: (None)")
     
     output_dir = Path("./mozilla_cv_data")
     output_dir.mkdir(exist_ok=True)
@@ -173,39 +182,42 @@ def main():
     # Test connectivity first
     test_api_connection()
     
-    # Step 1: Create session
-    session = create_download_session()
+    download_token = DOWNLOAD_TOKEN
     
-    if session is None:
-        print("\n❌ Failed to create download session.")
-        print("\nPossible issues:")
-        print("  1. Dataset ID may be incorrect")
-        print("  2. API key may need different permissions")
-        print("  3. API endpoint structure may differ")
-        print("\nTry visiting the Mozilla Data Collective website directly")
-        print("to verify the correct download process.")
-        return False
-    
-    # Extract token from response
-    if isinstance(session, str):
-        download_token = session
-    elif isinstance(session, dict):
-        # Try common key names
-        for key in ["download_token", "token", "downloadToken", "id", "url"]:
-            if key in session:
-                download_token = session[key]
-                break
+    # If no token provided, try to create a session
+    if not download_token:
+        print("\n[1/3] Creating download session...")
+        session = create_download_session()
+        
+        if session is None:
+            print("\n❌ Failed to create download session.")
+            print("\nPossible issues:")
+            print("  1. Dataset ID may be incorrect")
+            print("  2. API key may need different permissions")
+            return False
+        
+        # Extract token from response
+        if isinstance(session, str):
+            download_token = session
+        elif isinstance(session, dict):
+            # Try common key names
+            for key in ["download_token", "token", "downloadToken", "id", "url"]:
+                if key in session:
+                    download_token = session[key]
+                    break
+            else:
+                print(f"Session data: {json.dumps(session, indent=2)}")
+                download_token = input("Enter download token from response: ")
         else:
-            print(f"Session data: {json.dumps(session, indent=2)}")
-            download_token = input("Enter download token from response: ")
+            download_token = str(session)
     else:
-        download_token = str(session)
+        print("\n[1/3] Using provided Download Token (Skipping session creation)")
     
     print(f"      Token: {str(download_token)[:50]}...")
     
-    # Step 2: Download (Full dataset)
+    # Step 2: Download (7GB Partial)
     output_path = output_dir / "common_voice_sample.tar.gz"
-    max_bytes = None  # Download full dataset (no limit)
+    max_bytes = 7 * 1024 * 1024 * 1024  # 7 GB partial download
     
     success = download_with_token(download_token, str(output_path), max_bytes)
     
