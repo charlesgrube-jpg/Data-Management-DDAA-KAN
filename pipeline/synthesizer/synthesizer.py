@@ -162,7 +162,7 @@ class SynthesizerManager:
     
     def __init__(self, config: Config):
         self.config = config
-        self.tts_synthesizers: List[TTSSynthesizer] = []
+        self.tts_synthesizers: List[BaseSynthesizer] = [] # Changed type hint to base class
         self.vc_synthesizers: List[VCSynthesizer] = []
         self._initialized = False
     
@@ -172,10 +172,22 @@ class SynthesizerManager:
             return
         
         # Load TTS models
-        for model_name in self.config.synthesis.tts_models:
-            synth = TTSSynthesizer(model_name, device)
-            if synth.is_available():
-                self.tts_synthesizers.append(synth)
+        # Load TTS models (Coqui)
+        if hasattr(self.config.synthesis, 'tts_models'):
+            for model_name in self.config.synthesis.tts_models:
+                synth = TTSSynthesizer(model_name, device)
+                if synth.is_available():
+                    self.tts_synthesizers.append(synth)
+        
+        # Load Hugging Face Models (Bark/SpeechT5)
+        if hasattr(self.config.synthesis, 'huggingface_models'):
+            from pipeline.synthesizer.huggingface_synthesizer import HuggingFaceSynthesizer
+            for hf_model in self.config.synthesis.huggingface_models:
+                if hf_model.get('enabled', False):
+                    name = hf_model['name']
+                    synth = HuggingFaceSynthesizer(name, device)
+                    # We treat HF T2S models as TTS synthesizers
+                    self.tts_synthesizers.append(synth)
         
         # Load VC models
         for model_name in self.config.synthesis.vc_models:

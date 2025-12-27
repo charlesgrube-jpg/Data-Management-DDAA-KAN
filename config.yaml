@@ -34,6 +34,11 @@ synthesis:
   vc_device: "cpu"
   pick_strategy: "tts_only"   # Use TTS only
   fallback_on_error: false
+  huggingface_models:         # New: Hugging Face Generators
+    - name: "suno/bark"       # Codec Flavor
+      enabled: true
+    - name: "microsoft/speecht5_tts" # Vocoder/Traditional Flavor
+      enabled: true
 
 # --- Channel Effects ---
 effects:

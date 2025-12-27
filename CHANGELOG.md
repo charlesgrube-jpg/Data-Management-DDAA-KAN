@@ -30,6 +30,12 @@
   - Identified `rvc-python` incompatibility due to strict `numpy<=1.25` requirement vs Colab's `numpy>=1.26`.
   - Provided manual installation cells (git clone + no-deps install) to bypass these conflicts.
 
+### 4. New Features (Generalizability)
+- **Hugging Face Synthesis Module:**
+  - Integrated `transformers` to support **Suno Bark** (Codec Artifacts) and **SpeechT5** (Vocoder Artifacts).
+  - This diversifies the dataset beyond just GAN artifacts (RVC), crucial for robust detection.
+  - Avoids "Dependency Hell" of Coqui TTS by using standard Hugging Face pipelines.
+
 ---
 
 ## ⚠️ Known Issues & Remaining Work

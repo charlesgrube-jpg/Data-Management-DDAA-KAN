@@ -13,6 +13,9 @@ tqdm>=4.65.0
 # Synthesis (Linux-only friendly)
 edge-tts>=6.1.9
 gTTS>=2.5.0
+transformers>=4.33.0  # For Bark/SpeechT5
+sentencepiece>=0.1.99 # For text tokenization
+accelerate>=0.21.0    # For optimization
 # RVC Dependencies (Manual list to avoid Fairseq/Hydra conflict)
 hydra-core>=1.1
 omegaconf>=2.1
