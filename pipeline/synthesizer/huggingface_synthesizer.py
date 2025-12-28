@@ -8,7 +8,7 @@ from .base_factory import BaseSynthesizer
 
 # Try imports (transformers might not be installed)
 try:
-    from transformers import pipeline, AutoProcessor, BarkModel, SpeechT5Processor, SpeechT5ForTextToSpeech, SpeechT5HifiGan
+    from transformers import pipeline, AutoProcessor, BarkModel, SpeechT5Processor, SpeechT5ForTextToSpeech, SpeechT5HifiGan, VitsModel, AutoTokenizer
     from datasets import load_dataset
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
@@ -31,6 +31,7 @@ class HuggingFaceSynthesizer(BaseSynthesizer):
         self._model = None
         self._vocoder = None
         self._speaker_embeddings = None # For SpeechT5
+        self._tokenizer = None # For MMS
 
         if not TRANSFORMERS_AVAILABLE:
             print(f"⚠️ Transformers not installed. Skipping {model_name}.")
@@ -69,6 +70,14 @@ class HuggingFaceSynthesizer(BaseSynthesizer):
                 speaker_embeddings = torch.tensor(embeddings_dataset[7306]["xvector"]).unsqueeze(0)
                 self._speaker_embeddings = speaker_embeddings.to(device_str)
 
+            # --- CASE 3: MMS (Meta) ---
+            elif "mms" in self.model_name:
+                self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                self._model = VitsModel.from_pretrained(self.model_name)
+                
+                device_str = "cuda" if self.device == 0 else "cpu"
+                self._model.to(device_str)
+
         except Exception as e:
             print(f"❌ Failed to load {self.model_name}: {e}")
             self._pipe = "FAILED"
@@ -102,6 +111,18 @@ class HuggingFaceSynthesizer(BaseSynthesizer):
                 
                 # Convert tensor to numpy
                 speech_cpu = speech.cpu().numpy()
+                return speech_cpu
+
+            # --- MMS (Meta) ---
+            elif "mms" in self.model_name:
+                inputs = self._tokenizer(text, return_tensors="pt")
+                device_str = "cuda" if self.device == 0 else "cpu"
+                inputs = {k: v.to(device_str) for k, v in inputs.items()}
+
+                with torch.no_grad():
+                    output = self._model(**inputs).waveform
+
+                speech_cpu = output.cpu().numpy()[0] # (samples,)
                 return speech_cpu
 
         except Exception as e:

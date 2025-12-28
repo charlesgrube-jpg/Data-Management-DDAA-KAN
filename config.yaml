@@ -39,6 +39,8 @@ synthesis:
       enabled: true
     - name: "microsoft/speecht5_tts" # Vocoder/Traditional Flavor
       enabled: true
+    - name: "facebook/mms-tts-eng" # Flow/VITS Flavor
+      enabled: true
 
 # --- Channel Effects ---
 effects:
