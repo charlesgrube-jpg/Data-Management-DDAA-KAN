@@ -24,6 +24,11 @@ from pipeline.data_gen.validator import validate_dataset, generate_validation_re
 from pipeline.data_gen.exporter import export_dataset
 from pipeline.synthesizer.gtts_synthesizer import synthesize_tts
 from pipeline.synthesizer.synthesizer import get_synthesizer_manager
+from pipeline.features.cqt_extractor import CQTExtractor
+from pipeline.features.lfcc_extractor import LFCCExtractor
+import torch
+import numpy as np
+import os
 
 
 def run_mozilla_cv_pipeline():
@@ -231,11 +236,76 @@ def run_mozilla_cv_pipeline():
     print("-" * 40)
     
     export_stats = export_dataset(working_set, config)
+
+    # ============== PHASE 9: FEATURE EXTRACTION ==============
+    print("\n" + "-" * 40)
+    print("PHASE 9: Feature Extraction")
+    print("-" * 40)
+    
+    # Create feature processing directories
+    features_dir = output_path / "features"
+    cqt_dir = features_dir / "cqt"
+    lfcc_dir = features_dir / "lfcc"
+    cqt_dir.mkdir(parents=True, exist_ok=True)
+    lfcc_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Initialize Extractors
+    print("Initializing feature extractors...")
+    try:
+        cqt_extractor = CQTExtractor(
+            n_bins=config.features.cqt.n_bins,
+            hop_length=config.features.cqt.hop_length,
+            fmin=config.features.cqt.fmin,
+            device=config.features.device
+        )
+        lfcc_extractor = LFCCExtractor(
+            n_lfcc=config.features.lfcc.n_lfcc,
+            n_filters=config.features.lfcc.n_filters,
+            n_fft=config.features.lfcc.n_fft,
+            hop_length=config.features.lfcc.hop_length,
+            device=config.features.device
+        )
+        
+        print(f"Extracting features for {len(working_set)} samples...")
+        feat_count = 0
+        
+        for sample in tqdm(working_set, desc="Extracting Features", unit="file"):
+            audio = sample["audio"]
+            # Ensure float32
+            if audio.dtype != np.float32:
+                audio = audio.astype(np.float32)
+                
+            # Extract CQT
+            try:
+                cqt = cqt_extractor.extract(audio)
+                # Save as .pt
+                cqt_path = cqt_dir / f"{sample['source_id']}_chunk{sample['chunk_idx']:03d}_{'syn' if sample['is_synthetic'] else 'real'}.pt"
+                torch.save(torch.from_numpy(cqt), cqt_path)
+            except Exception as e:
+                print(f"Failed CQT for {sample['source_id']}: {e}")
+
+            # Extract LFCC
+            try:
+                lfcc = lfcc_extractor.extract(audio)
+                # Save as .pt
+                lfcc_path = lfcc_dir / f"{sample['source_id']}_chunk{sample['chunk_idx']:03d}_{'syn' if sample['is_synthetic'] else 'real'}.pt"
+                torch.save(torch.from_numpy(lfcc), lfcc_path)
+            except Exception as e:
+                print(f"Failed LFCC for {sample['source_id']}: {e}")
+                
+            feat_count += 1
+            
+        print(f"Feature extraction complete. Saved to {features_dir}")
+        
+    except Exception as e:
+        print(f"[ERROR] Feature extraction initialized failed: {e}")
+        import traceback
+        traceback.print_exc()
     
     # ============== DONE ==============
     # ============== DONE ==============
     elapsed = time.time() - start_time
-    total_mb_processed = sum(s.get('original_size', 0) for s in processed_samples) / 1024 / 1024
+    total_mb_processed = sum(s.get('original_size', 0) for s in working_set) / 1024 / 1024
     throughput = total_mb_processed / elapsed if elapsed > 0 else 0
     
     # Estimate for 3.5 GB (Common Voice English partial)
@@ -252,10 +322,8 @@ def run_mozilla_cv_pipeline():
         print(f"📉 ESTIMATED TIME for 3.5GB Dataset: {estimated_hours:.2f} hours")
         
     print(f"Output: {config.output.base_dir}")
-    print(f"Total samples: {len(processed_samples)}")
-    print(f"  Train: {len(train_metadata)}")
-    print(f"  Val: {len(val_metadata)}")
-    print(f"  Test: {len(test_metadata)}")
+    print(f"Total samples: {len(working_set)}")
+    print(f"Pipeline finished successfully.")
     
     return True
 

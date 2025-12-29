@@ -110,11 +110,33 @@ def get_available_voices() -> List[str]:
     return EDGE_TTS_VOICES.copy()
 
 
-if __name__ == "__main__":
-    # Test
-    print("Testing Edge-TTS...")
-    audio = synthesize_edge_tts("Hello, this is a test of Edge TTS synthesis.")
     if audio is not None:
         print(f"Success! Generated {len(audio)} samples ({len(audio)/16000:.2f}s)")
     else:
         print("Failed!")
+
+from .base import BaseSynthesizer
+
+class EdgeTTSSynthesizer(BaseSynthesizer):
+    """
+    Wrapper for Edge-TTS to be used in SynthesizerManager.
+    Model name format: "edge-tts:VoiceName" or just "edge-tts" (random voice).
+    """
+    def __init__(self, model_name: str, device: str = "cpu"):
+        self.model_name = model_name
+        # Parse voice from model name "edge-tts:VoiceName"
+        if ":" in model_name:
+            self.voice = model_name.split(":", 1)[1]
+        else:
+            self.voice = None # Random
+            
+    def is_available(self) -> bool:
+        # Edge-TTS is python only, always available if installed
+        try:
+            import edge_tts
+            return True
+        except ImportError:
+            return False
+
+    def synthesize(self, text: str) -> Optional[np.ndarray]:
+        return synthesize_edge_tts(text, voice=self.voice)

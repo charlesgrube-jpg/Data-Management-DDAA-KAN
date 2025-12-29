@@ -19,8 +19,8 @@ class SourceConfig:
     language: str
     split: str
     max_samples: Optional[int]
-    max_size_mb: Optional[float] = None # Limit by total audio size in MB
     cache_dir: str
+    max_size_mb: Optional[float] = None # Limit by total audio size in MB
     streaming: bool = True  # Stream to avoid downloading entire dataset
     data_path: Optional[str] = None # Custom path for data (e.g. for Colab)
 
@@ -47,6 +47,7 @@ class SynthesisConfig:
     vc_models: List[str]
     pick_strategy: str  # "random", "both", "tts_only", "vc_only"
     fallback_on_error: bool
+    huggingface_models: Optional[List[Dict]] = None
     vc_device: str = "cpu"  # Device for VC: "cpu" or "cuda:0"
 
 
@@ -90,6 +91,30 @@ class ValidationConfig:
 
 
 @dataclass
+class CQTConfig:
+    n_bins: int
+    hop_length: int
+    fmin: float
+
+
+@dataclass
+class LFCCConfig:
+    n_lfcc: int
+    n_filters: int
+    n_fft: int
+    hop_length: int
+
+
+@dataclass
+class FeaturesConfig:
+    type: str
+    device: str
+    output_format: str
+    cqt: CQTConfig
+    lfcc: LFCCConfig
+
+
+@dataclass
 class Config:
     """Master configuration container."""
     source: SourceConfig
@@ -100,7 +125,9 @@ class Config:
     codec_compression: CodecCompressionConfig
     splits: SplitsConfig
     output: OutputConfig
+    output: OutputConfig
     validation: ValidationConfig
+    features: FeaturesConfig
     seed: Optional[int]
     
     def set_seed(self):
@@ -145,6 +172,13 @@ def load_config(config_path: str = "config.yaml") -> Config:
         splits=SplitsConfig(**raw['splits']),
         output=OutputConfig(**raw['output']),
         validation=ValidationConfig(**raw['validation']),
+        features=FeaturesConfig(
+            type=raw['features']['type'],
+            device=raw['features']['device'],
+            output_format=raw['features']['output_format'],
+            cqt=CQTConfig(**raw['features']['cqt']),
+            lfcc=LFCCConfig(**raw['features']['lfcc'])
+        ),
         seed=raw.get('seed')
     )
     

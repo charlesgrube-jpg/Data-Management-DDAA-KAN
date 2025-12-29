@@ -13,18 +13,7 @@ from typing import Dict, Any, Optional, List, Tuple
 import random
 from abc import ABC, abstractmethod
 from pipeline.config import Config
-
-
-class BaseSynthesizer(ABC):
-    """Abstract base class for audio synthesizers."""
-    
-    @abstractmethod
-    def synthesize(self, *args, **kwargs) -> np.ndarray:
-        pass
-    
-    @abstractmethod
-    def is_available(self) -> bool:
-        pass
+from .base import BaseSynthesizer
 
 
 class TTSSynthesizer(BaseSynthesizer):
@@ -175,7 +164,12 @@ class SynthesizerManager:
         # Load TTS models (Coqui)
         if hasattr(self.config.synthesis, 'tts_models'):
             for model_name in self.config.synthesis.tts_models:
-                synth = TTSSynthesizer(model_name, device)
+                if model_name.startswith("edge-tts"):
+                    from pipeline.synthesizer.edge_tts_synthesizer import EdgeTTSSynthesizer
+                    synth = EdgeTTSSynthesizer(model_name, device)
+                else:
+                    synth = TTSSynthesizer(model_name, device)
+                
                 if synth.is_available():
                     self.tts_synthesizers.append(synth)
         
@@ -315,7 +309,15 @@ class SynthesizerManager:
         strategy = self.config.synthesis.pick_strategy
         
         if strategy == "both":
-            # Return TTS, caller should also use VC separately
+            # Return TTS if available, else VC.
+            # In a real pipeline handling "both", the caller should probably ask for them specifically.
+            # But here we just return one main result for the metadata linkage.
+            # If both exist, we prefer TTS as the "primary" generation for this slot?
+            # Or we returns TTS, and let the caller loop again?
+            # Current implementation expects a single return.
+            # Fix: If one is None, return the other.
+            if tts_result and vc_result:
+                return tts_result # Arbitrary preference
             return tts_result or vc_result
         
         if strategy == "tts_only":

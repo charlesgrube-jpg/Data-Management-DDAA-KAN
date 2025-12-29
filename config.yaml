@@ -8,43 +8,47 @@ source:
   dataset_name: "mozilla-foundation/common_voice_13_0"
   language: "en"
   split: "train"  # Use train.tsv
-  max_samples: 50  # Use up to 50 of the 67 available clips
+  max_samples: 5  # Use up to 5 of the available clips
   cache_dir: "./cache"
   streaming: true   # Stream data to avoid downloading 80GB+
   data_path: "mozilla_cv_data/cv-corpus-24.0-2025-12-05/en" # Default path, override in Colab
 
 # --- Audio Processing ---
 audio:
-  target_sr: 16000           # Sample rate in Hz
-  normalize_db: -20          # RMS normalization target (dBFS)
-  silence_threshold_db: 40   # For trimming (higher = more aggressive)
-  min_duration: 1.0          # Minimum chunk duration (seconds)
-  max_duration: 10.0         # Maximum source audio duration (skip longer)
+  target_sr: 22050
+  normalize_db: -20.0
+  silence_threshold_db: 60.0 # Positive dB for librosa top_db (keep 60dB range)
+  min_duration: 1.0
+  max_duration: 15.0
 
 # --- Segmentation ---
 segmentation:
-  chunk_duration: 3.0        # Target chunk duration (seconds)
-  overlap: 0.0               # Overlap ratio (0.0 = no overlap)
-  pad_last_chunk: true       # Pad if last chunk is shorter
+  chunk_duration: 5.0
+  overlap: 0.0 # No overlap for cleaner dataset
+  pad_last_chunk: true
 
 # --- Synthesis ---
 synthesis:
-  tts_models: []              # Empty = use gTTS fallback (no DLL issues)
-  vc_models: []               # Empty = skip RVC
-  vc_device: "cpu"
-  pick_strategy: "tts_only"   # Use TTS only
-  fallback_on_error: false
+  tts_models:
+    # - "coqui-tts:tts_models/en/ljspeech/glow-tts"
+    - "edge-tts:en-US-GuyNeural" # Edge-TTS requires internet
+  vc_models:
+    # - "rvc:assets/weights/trump.pth" # RVC REQUIRES WEIGHTS
+    []
+  vc_device: "cuda:0" # Change to "cpu" if no GPU
+  pick_strategy: "random" # "random", "both" (User + Synthetic), "tts_only", "vc_only"
+  fallback_on_error: false # STRICT MODE: Fail if generation fails (prevents bad labels)
   huggingface_models:         # New: Hugging Face Generators
     - name: "suno/bark"       # Codec Flavor
       enabled: true
-    - name: "microsoft/speecht5_tts" # Vocoder/Traditional Flavor
+    - name: "microsoft/speecht5_tts" # Vocoder Flavor
       enabled: true
-    - name: "facebook/mms-tts-eng" # Flow/VITS Flavor
+    - name: "facebook/mms-tts-eng"   # Flow/VITS Flavor
       enabled: true
 
 # --- Channel Effects ---
 effects:
-  enabled: true
+  enabled: false # Disable effects for clean verifiable test
   quality_distribution:
     clean: 0.40              # No degradation
     mobile: 0.40             # Light compression + mild noise

@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import scipy.io.wavfile as wav
 import tempfile
-from .base_factory import BaseSynthesizer
+from .base import BaseSynthesizer
 
 # Try imports (transformers might not be installed)
 try:
@@ -37,6 +37,10 @@ class HuggingFaceSynthesizer(BaseSynthesizer):
             print(f"⚠️ Transformers not installed. Skipping {model_name}.")
             return
 
+    def is_available(self) -> bool:
+        """Check if transformers is installed."""
+        return TRANSFORMERS_AVAILABLE
+
     def _load_model(self):
         """Lazy load the specific model pipeline."""
         if self._pipe is not None or self._model is not None:
@@ -65,9 +69,12 @@ class HuggingFaceSynthesizer(BaseSynthesizer):
                 self._model.to(device_str)
                 self._vocoder.to(device_str)
 
-                # Load xvector speaker embedding (generic default)
-                embeddings_dataset = load_dataset("Matthijs/cmu-arctic-xvectors", split="validation", trust_remote_code=True)
-                speaker_embeddings = torch.tensor(embeddings_dataset[7306]["xvector"]).unsqueeze(0)
+                # Load xvector speaker embedding
+                # NOTE: The 'Matthijs/cmu-arctic-xvectors' dataset uses a custom script which huggingface 'datasets'
+                # blocked for security. For deepfake generation, a random valid embedding (1, 512) works fine
+                # and actually adds nice variety (sometimes).
+                # Ideally we would load a saved one, but random is sufficient for testing/generation.
+                speaker_embeddings = torch.randn(1, 512)
                 self._speaker_embeddings = speaker_embeddings.to(device_str)
 
             # --- CASE 3: MMS (Meta) ---
