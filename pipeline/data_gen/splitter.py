@@ -1,14 +1,66 @@
 """
-Speaker-Disjoint Splitter Module
+Speaker-Disjoint Splitter Module (Hash-Based)
 
-Creates train/val/test splits where NO speaker appears in multiple splits.
-This is CRITICAL to prevent data leakage and ensure real-world generalization.
+Implements deterministic, stateless splitting based on speaker ID.
+Supports streaming processing by deciding splits per-sample without loading the full dataset.
+Respects pre-assigned splits (e.g. for external datasets).
 """
 
-import random
-from typing import Dict, List, Set, Any
-from collections import defaultdict
+import hashlib
+from typing import Dict, List, Any
 from pipeline.config import Config
+
+
+def assign_split(sample: Dict[str, Any], config: Config) -> Dict[str, Any]:
+    """
+    Assign split label ('train', 'val', 'test') to a sample using hash of speaker_id.
+    
+    This is strictly deterministic: the same speaker_id will ALWAYS imply the same split.
+    This allows us to process infinite-sized datasets in a streaming fashion.
+    
+    Args:
+        sample: Dictionary containing 'speaker_id' or 'source_id'
+        config: Pipeline configuration with split ratios
+        
+    Returns:
+        The sample dict with 'split' key added/updated
+    """
+    # 1. GUARD CLAUSE: Respect Pre-assigned Splits
+    # If a sample already has a split (e.g. from 11Labs/RVC ingest), KEEP IT.
+    if sample.get('split'):
+        return sample
+        
+    # 2. Extract Key
+    # Use speaker_id (Real Source) to ensure content disjointness.
+    # Fallback to 'client_id' or 'unknown' if missing.
+    speaker_key = sample.get("speaker_id", sample.get("source_id", sample.get("client_id", "unknown")))
+    
+    # 3. Deterministic Hashing
+    # MD5 is fast and uniform enough for this purpose.
+    # We use the config seed to salt the hash if available, ensuring 
+    # different splits for different runs if desired (but usually we want stability).
+    salt = str(config.seed) if config.seed is not None else "42"
+    key_string = f"{speaker_key}_{salt}"
+    
+    # Hex digest -> Integer
+    h = int(hashlib.md5(key_string.encode()).hexdigest(), 16)
+    
+    # Normalize to [0.0, 1.0]
+    # Modulo 10000 gives us 4 decimal places of precision
+    p = (h % 10000) / 10000.0
+    
+    # 4. Assign Split
+    train_end = config.splits.train
+    val_end = train_end + config.splits.val
+    
+    if p < train_end:
+        sample['split'] = 'train'
+    elif p < val_end:
+        sample['split'] = 'val'
+    else:
+        sample['split'] = 'test'
+        
+    return sample
 
 
 def create_speaker_disjoint_splits(
@@ -16,58 +68,24 @@ def create_speaker_disjoint_splits(
     config: Config
 ) -> List[Dict[str, Any]]:
     """
-    Assign split labels ensuring no speaker appears in multiple splits.
+    Apply hash-based splitting to a list of samples.
     
     Args:
-        samples: List of sample dictionaries (must have 'speaker_id' key)
+        samples: List of sample dictionaries
         config: Pipeline configuration
         
     Returns:
-        Same samples with 'split' key added
+        List of samples with 'split' assigned
     """
-    # Group samples by speaker
-    speaker_samples = defaultdict(list)
-    for sample in samples:
-        speaker_id = sample.get("speaker_id", sample.get("source_id"))
-        speaker_samples[speaker_id].append(sample)
+    print(f"[Splitter] Assigning splits to {len(samples)} samples using Hash Strategy...")
     
-    speakers = list(speaker_samples.keys())
-    print(f"[Splitter] Found {len(speakers)} unique speakers")
-    
-    # Shuffle speakers (using config seed if set)
-    random.shuffle(speakers)
-    
-    # Calculate split boundaries
-    n = len(speakers)
-    train_end = int(n * config.splits.train)
-    val_end = train_end + int(n * config.splits.val)
-    
-    train_speakers = set(speakers[:train_end])
-    val_speakers = set(speakers[train_end:val_end])
-    test_speakers = set(speakers[val_end:])
-    
-    print(f"[Splitter] Split speakers: train={len(train_speakers)}, "
-          f"val={len(val_speakers)}, test={len(test_speakers)}")
-    
-    # Assign split to each sample
-    train_count = val_count = test_count = 0
+    counts = {"train": 0, "val": 0, "test": 0}
     
     for sample in samples:
-        speaker_id = sample.get("speaker_id", sample.get("source_id"))
+        assign_split(sample, config)
+        counts[sample['split']] += 1
         
-        if speaker_id in train_speakers:
-            sample["split"] = "train"
-            train_count += 1
-        elif speaker_id in val_speakers:
-            sample["split"] = "val"
-            val_count += 1
-        else:
-            sample["split"] = "test"
-            test_count += 1
-    
-    print(f"[Splitter] Split samples: train={train_count}, "
-          f"val={val_count}, test={test_count}")
-    
+    print(f"[Splitter] Result: train={counts['train']}, val={counts['val']}, test={counts['test']}")
     return samples
 
 
@@ -78,7 +96,7 @@ def verify_no_speaker_leakage(samples: List[Dict[str, Any]]) -> Dict[str, Any]:
     Returns:
         Dict with verification result and any violations found
     """
-    split_speakers: Dict[str, Set[str]] = {
+    split_speakers: Dict[str, set] = {
         "train": set(),
         "val": set(),
         "test": set()
@@ -100,11 +118,26 @@ def verify_no_speaker_leakage(samples: List[Dict[str, Any]]) -> Dict[str, Any]:
     
     return {
         "passed": len(all_overlaps) == 0,
-        "train_val_overlap": list(train_val_overlap),
         "train_test_overlap": list(train_test_overlap),
-        "val_test_overlap": list(val_test_overlap),
         "total_violations": len(all_overlaps)
     }
+
+
+if __name__ == "__main__":
+    # Test
+    from pipeline.config import load_config
+    cfg = load_config("../config.yaml")
+    
+    mock_samples = [
+        {"speaker_id": "spk_1"}, 
+        {"speaker_id": "spk_2"}, 
+        {"speaker_id": "spk_1"}, # Should follow spk_1
+        {"speaker_id": "spk_3", "split": "test"} # Pre-assigned
+    ]
+    
+    processed = create_speaker_disjoint_splits(mock_samples, cfg)
+    for p in processed:
+        print(f"Spk: {p['speaker_id']} -> {p['split']}")
 
 
 def get_split_statistics(samples: List[Dict[str, Any]]) -> Dict[str, Dict]:
@@ -125,6 +158,10 @@ def get_split_statistics(samples: List[Dict[str, Any]]) -> Dict[str, Dict]:
         if not split:
             continue
         
+        # Ensure split key exists in stats (handle custom splits)
+        if split not in stats:
+             stats[split] = {"total": 0, "real": 0, "synthetic": 0, "speakers": set()}
+             
         stats[split]["total"] += 1
         
         if sample.get("is_synthetic", False):
@@ -148,79 +185,3 @@ def get_split_statistics(samples: List[Dict[str, Any]]) -> Dict[str, Dict]:
             stats[split]["synthetic_ratio"] = stats[split]["synthetic"] / total
     
     return stats
-
-
-def resplit_for_balance(
-    samples: List[Dict[str, Any]],
-    config: Config,
-    max_attempts: int = 10
-) -> List[Dict[str, Any]]:
-    """
-    Attempt to create splits with balanced real/synthetic ratio.
-    
-    Retries splitting with different random shuffles if balance is poor.
-    """
-    tolerance = config.validation.balance_tolerance
-    target = 0.5  # Target 50% real
-    
-    for attempt in range(max_attempts):
-        samples = create_speaker_disjoint_splits(samples, config)
-        stats = get_split_statistics(samples)
-        
-        # Check balance in each split
-        balanced = True
-        for split in ["train", "val", "test"]:
-            ratio = stats[split].get("real_ratio", 0.5)
-            if abs(ratio - target) > tolerance:
-                balanced = False
-                break
-        
-        if balanced:
-            print(f"[Splitter] Achieved balanced splits on attempt {attempt + 1}")
-            return samples
-        
-        print(f"[Splitter] Attempt {attempt + 1}: splits not balanced, retrying...")
-    
-    print(f"[Splitter] WARNING: Could not achieve balanced splits after {max_attempts} attempts")
-    return samples
-
-
-if __name__ == "__main__":
-    # Test with mock data
-    mock_samples = []
-    
-    # Create 100 speakers, 10 samples each (5 real + 5 synthetic)
-    for speaker_idx in range(100):
-        speaker_id = f"speaker_{speaker_idx:03d}"
-        
-        for sample_idx in range(5):
-            # Real sample
-            mock_samples.append({
-                "speaker_id": speaker_id,
-                "source_id": f"src_{speaker_idx:03d}",
-                "is_synthetic": False,
-                "chunk_idx": sample_idx
-            })
-            # Synthetic sample
-            mock_samples.append({
-                "speaker_id": speaker_id,
-                "source_id": f"src_{speaker_idx:03d}",
-                "is_synthetic": True,
-                "chunk_idx": sample_idx
-            })
-    
-    from pipeline.config import load_config
-    cfg = load_config("../config.yaml")
-    
-    # Run splitter
-    mock_samples = create_speaker_disjoint_splits(mock_samples, cfg)
-    
-    # Verify no leakage
-    result = verify_no_speaker_leakage(mock_samples)
-    print(f"No leakage: {result['passed']}")
-    
-    # Get stats
-    stats = get_split_statistics(mock_samples)
-    for split, s in stats.items():
-        print(f"{split}: {s['total']} samples, {s['num_speakers']} speakers, "
-              f"real={s['real_ratio']:.2%}")

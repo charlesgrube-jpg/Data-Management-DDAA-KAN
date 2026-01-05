@@ -13,8 +13,12 @@ processed_dataset_*/
 processed_tts/
 
 # Model files (downloaded, large)
+models/
+!models/.keep
 rvc_models/
 *.pth
+*.zip
+*.index
 # Note: .pt files (PyTorch tensors) not ignored - needed for feature outputs
 
 # Python
@@ -50,3 +54,5 @@ Thumbs.db
 
 # Feature output directories (generated)
 features_*/
+
+utilities/test_synthesis_output/

@@ -29,15 +29,53 @@ segmentation:
 
 # --- Synthesis ---
 synthesis:
-  tts_models:
-    # - "coqui-tts:tts_models/en/ljspeech/glow-tts"
-    - "edge-tts:en-US-GuyNeural" # Edge-TTS requires internet
-  vc_models:
-    # - "rvc:assets/weights/trump.pth" # RVC REQUIRES WEIGHTS
-    []
+  # --- Voice Disjoint Strategy (V3) ---
+  # Deprecated: tts_models (Use voice_pools instead)
+  voice_pools:
+    train:
+      - "edge-tts:en-US-GuyNeural"
+      - "edge-tts:en-US-JennyNeural"
+      - "bark:v2/en_speaker_6"
+    test:
+      - "edge-tts:en-US-AriaNeural"     # Unseen Edge Voice
+      - "edge-tts:en-US-ChristopherNeural"
+      - "bark:v2/en_speaker_9"          # Unseen Bark Voice
+    val:
+      - "edge-tts:en-US-MichelleNeural"
+
+  # Generators restricted to TRAIN only (Single-voice models)
+  train_only_models:
+    - "facebook/mms-tts-eng"          # MMS usually has 1 voice per lang
+    - "microsoft/speecht5_tts"        # SpeechT5 (treat as augmentation)
+
+  # --- RVC Voice Pools (Split-Partitioned) ---
+  # IMPORTANT: Each pool must contain DISJOINT model paths
+  vc_pools:
+    train:
+      - "models/rvc/TaylorSwift/model.pth"
+      - "models/rvc/KanyeWest/kanyewestgraduation.pth"
+      - "models/rvc/ArianaGrande/Ariana Grande.pth"
+      - "models/rvc/Rihanna/Rihanna.pth"
+      - "models/rvc/GokuEnglish/Goku.pth"
+      - "models/rvc/Spongebob/Spongebob.pth"
+    test:
+      - "models/rvc/Biden/biden.pth"
+      - "models/rvc/Trump/trump.pth"
+      - "models/rvc/Adele/adelemodel.pth"
+      - "models/rvc/Shakira/Shakira (Classic Era).pth"
+      - "models/rvc/HomerSimpson/Homer Simpson.pth" 
+    val:
+      - "models/rvc/EdSheeran/Ed Sheeran.pth"
+      - "models/rvc/Obama/obama.pth"
+      - "models/rvc/KatyPerry/Katy Perry.pth"
+      - "models/rvc/Vegeta/Vegeta.pth"
+
+  vc_models: []   # DEPRECATED: Use vc_pools instead
+  enable_vc: false    # MASTER SWITCH: Set to false to strictly bypass RVC/OpenVoice
   vc_device: "cuda:0" # Change to "cpu" if no GPU
-  pick_strategy: "random" # "random", "both" (User + Synthetic), "tts_only", "vc_only"
+  pick_strategy: "balanced_subset" # New strategy for pool-based selection
   fallback_on_error: false # STRICT MODE: Fail if generation fails (prevents bad labels)
+
   huggingface_models:         # New: Hugging Face Generators
     - name: "suno/bark"       # Codec Flavor
       enabled: true
@@ -90,6 +128,20 @@ validation:
   check_duplicates: false    # Disabled: real+synthetic pairs share same base
   check_speaker_leakage: true
   min_samples_per_split: 10  # Lowered for small test dataset
+
+# --- Feature Extraction ---
+external_datasets:
+  elevenlabs:
+    enabled: false
+    repo_id: "skypro1111/elevenlabs_dataset"
+    subdir: "elevenlabs"
+    split: "test" # STRICT: Always Test
+    # max_samples: 10 # Smoke Test Limit
+  asvspoof:
+    enabled: false
+    repo_id: "" # Placeholder
+    subdir: "asvspoof"
+    split: "test"
 
 # --- Feature Extraction ---
 features:

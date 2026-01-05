@@ -42,13 +42,32 @@ class SegmentationConfig:
 
 
 @dataclass
+class VoicePoolsConfig:
+    train: List[str]
+    test: List[str]
+    val: List[str] = field(default_factory=list)
+
+
+@dataclass
+class VCPoolsConfig:
+    """Voice Conversion model pools, split-partitioned for disjointness."""
+    train: List[str] = field(default_factory=list)
+    test: List[str] = field(default_factory=list)
+    val: List[str] = field(default_factory=list)
+
+
+@dataclass
 class SynthesisConfig:
-    tts_models: List[str]
-    vc_models: List[str]
+    # Deprecated: tts_models
+    voice_pools: VoicePoolsConfig
+    vc_pools: VCPoolsConfig  # NEW: Split-aware VC model pools
+    train_only_models: List[str]
     pick_strategy: str  # "random", "both", "tts_only", "vc_only"
     fallback_on_error: bool
     huggingface_models: Optional[List[Dict]] = None
-    vc_device: str = "cpu"  # Device for VC: "cpu" or "cuda:0"
+    vc_device: str = "cpu"
+    vc_models: List[str] = field(default_factory=list)  # DEPRECATED: Use vc_pools
+    enable_vc: bool = False
 
 
 @dataclass
@@ -98,6 +117,14 @@ class CQTConfig:
 
 
 @dataclass
+class ExternalDatasetConfig:
+    enabled: bool
+    repo_id: str
+    subdir: str
+    split: str
+    max_samples: Optional[int] = None
+
+@dataclass
 class LFCCConfig:
     n_lfcc: int
     n_filters: int
@@ -128,7 +155,10 @@ class Config:
     output: OutputConfig
     validation: ValidationConfig
     features: FeaturesConfig
-    seed: Optional[int]
+    validation: ValidationConfig
+    features: FeaturesConfig
+    external_datasets: Optional[Dict[str, ExternalDatasetConfig]] = None
+    seed: Optional[int] = None
     
     def set_seed(self):
         """Set random seeds for reproducibility if seed is specified."""
@@ -166,7 +196,17 @@ def load_config(config_path: str = "config.yaml") -> Config:
         source=SourceConfig(**raw['source']),
         audio=AudioConfig(**raw['audio']),
         segmentation=SegmentationConfig(**raw['segmentation']),
-        synthesis=SynthesisConfig(**raw['synthesis']),
+        synthesis=SynthesisConfig(
+            voice_pools=VoicePoolsConfig(**raw['synthesis']['voice_pools']),
+            vc_pools=VCPoolsConfig(**raw['synthesis'].get('vc_pools', {})),
+            train_only_models=raw['synthesis'].get('train_only_models', []),
+            pick_strategy=raw['synthesis']['pick_strategy'],
+            fallback_on_error=raw['synthesis']['fallback_on_error'],
+            huggingface_models=raw['synthesis'].get('huggingface_models'),
+            vc_device=raw['synthesis'].get('vc_device', 'cpu'),
+            vc_models=raw['synthesis'].get('vc_models', []),
+            enable_vc=raw['synthesis'].get('enable_vc', False)
+        ),
         effects=EffectsConfig(**raw['effects']),
         codec_compression=CodecCompressionConfig(**raw['codec_compression']),
         splits=SplitsConfig(**raw['splits']),
@@ -179,6 +219,10 @@ def load_config(config_path: str = "config.yaml") -> Config:
             cqt=CQTConfig(**raw['features']['cqt']),
             lfcc=LFCCConfig(**raw['features']['lfcc'])
         ),
+        external_datasets={
+            k: ExternalDatasetConfig(**v) 
+            for k, v in raw.get('external_datasets', {}).items()
+        },
         seed=raw.get('seed')
     )
     

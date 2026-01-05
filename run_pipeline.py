@@ -9,6 +9,7 @@ Usage:
 
 import sys
 import time
+import json
 from pathlib import Path
 
 # Add parent to path for imports
@@ -19,7 +20,7 @@ from pipeline.data_gen.mozilla_cv_loader import load_mozilla_cv, get_available_c
 from pipeline.standardizer.preprocessor import preprocess_audio
 from pipeline.standardizer.segmenter import segment_audio
 from pipeline.effects.effects import apply_effects, apply_effects_to_pair
-from pipeline.data_gen.splitter import create_speaker_disjoint_splits
+from pipeline.data_gen.splitter import assign_split
 from pipeline.data_gen.validator import validate_dataset, generate_validation_report
 from pipeline.data_gen.exporter import export_dataset
 from pipeline.synthesizer.gtts_synthesizer import synthesize_tts
@@ -55,11 +56,11 @@ def run_mozilla_cv_pipeline():
     cv_path = Path(cv_path_str)
     
     if not cv_path.exists():
-        print(f"\n[ERROR] Mozilla CV data not found at {cv_path}")
+        print(f"\\n[ERROR] Mozilla CV data not found at {cv_path}")
         print("Run: python download_partial.py")
         return False
     
-    print(f"\nSource: {cv_path}")
+    print(f"\\nSource: {cv_path}")
     print(f"Output: {output_path} (timestamped)")
     
     # Check what clips are available
@@ -71,7 +72,7 @@ def run_mozilla_cv_pipeline():
         return False
     
     # ============== PHASE 1: LOAD MOZILLA CV ==============
-    print("\n" + "-" * 40)
+    print("\\n" + "-" * 40)
     print("PHASE 1: Loading Mozilla Common Voice")
     print("-" * 40)
     
@@ -88,12 +89,87 @@ def run_mozilla_cv_pipeline():
     from tqdm import tqdm
     total_samples = config.source.max_samples if config.source.max_samples else len(available_clips)
     
+    # Phase 1.8: Ingest External Data (V3 Update)
+    # Load external samples ONCE before the main loop
+    if hasattr(config, 'external_datasets'):
+         ext_meta_path = Path("external_data/metadata_external.json")
+         if ext_meta_path.exists():
+              with open(ext_meta_path, 'r') as f:
+                  ext_samples = json.load(f)
+              
+              # Filter enabled datasets and apply max_samples
+              enabled_datasets = {k: v for k, v in config.external_datasets.items() if v.enabled}
+              final_ext_samples = []
+              
+              for method, cfg in enabled_datasets.items():
+                  # Get samples for this method
+                  method_samples = [s for s in ext_samples if s.get('method') == method]
+                  
+                  # Limit if max_samples is set
+                  if cfg.max_samples is not None:
+                      method_samples = method_samples[:cfg.max_samples]
+                      print(f"[Pipeline] Limited {method} to {len(method_samples)} samples")
+                  
+                  final_ext_samples.extend(method_samples)
+                  
+              ext_samples = final_ext_samples
+              
+              if ext_samples:
+                   print(f"[Pipeline] Ingesting {len(ext_samples)} external samples...")
+                   
+                   # Normalize path to absolute and LOAD AUDIO
+                   import soundfile as sf
+                   # Note: We use preprocess_audio below for standardizing
+                   
+                   valid_ext_samples = []
+                   for i, s in enumerate(ext_samples):
+                       try:
+                           path = str(Path(s['path']).resolve())
+                           s['audio_path'] = path
+                           
+                           # Load Audio
+                           audio, sr = sf.read(path)
+                           
+                           # Ensure float32
+                           if audio.dtype != np.float32:
+                                audio = audio.astype(np.float32)
+
+                           # Use standard preprocessor for resampling/mono/norm
+                           processed_audio, meta = preprocess_audio(audio, sr, config)
+                           
+                           if processed_audio is not None:
+                               s['audio'] = processed_audio
+                               s['sample_rate'] = config.audio.target_sr
+                               s['chunk_idx'] = 0 # Treat as single chunk
+                               s['quality_tier'] = 'clean'
+                               s['source_id'] = f"ext_{s['method']}_{i:06d}" # Generate unique ID
+                               s['duration'] = meta.get('duration', len(processed_audio)/config.audio.target_sr)
+                               
+                               valid_ext_samples.append(s)
+                           else:
+                               print(f"[Pipeline] Skipped external sample {path}: {meta.get('skip_reason')}")
+
+                       except Exception as e:
+                           print(f"[Pipeline] Failed to load external sample {s.get('path')}: {e}")
+                       
+                   working_set.extend(valid_ext_samples)
+         else:
+              # Only warn if external datasets are enabled in config
+              if any(v.enabled for v in config.external_datasets.values()):
+                   print("[Pipeline] WARNING: External datasets enabled but metadata_external.json not found.")
+                   print("           Run 'utilities/download_external_datasets.py' first.")
+
     # Create the generator
     loader_gen = load_mozilla_cv(str(cv_path), config, split=config.source.split)
     
     # Wrap in tqdm
     for sample in tqdm(loader_gen, total=total_samples, desc="Processing Samples", unit="sample"):
         source_count += 1
+        
+        # Phase 1.5: Assign Split Immediately (V3 Strategy)
+        # This ensures we know if a sample is train/test BEFORE generating audio.
+        # This allows us to pick "Test Only" voices for test samples.
+        assign_split(sample, config)
         
         # Phase 2: Preprocess
         processed_audio, preprocess_meta = preprocess_audio(
@@ -122,17 +198,45 @@ def run_mozilla_cv_pipeline():
         print(f"          \"{sample['transcript'][:50]}...\"")
         
         for chunk in chunks:
-            # Phase 4: Synthesize using TTS/VC based on strategy
+            # Phase 4: Synthesize using TTS/VC based on strategy and split
             transcript = sample.get("transcript", "")
+            split = sample.get("split", "train")
+            
+            # --- VOICE SELECTION LOGIC (V3) ---
+            selected_voice = None
+            
+            # Determine which pool to use based on split
+            if split == "test":
+                # STRICT: Must come from Test Pool
+                pool = config.synthesis.voice_pools.test
+                if not pool:
+                    print(f"    [WARNING] Test pool is empty! Check config.")
+                else:
+                    selected_voice = np.random.choice(pool)
+            else:
+                # TRAIN/VAL: Can use Train Pool OR Train-Only Models
+                pool = config.synthesis.voice_pools.train
+                train_only = config.synthesis.train_only_models
+                
+                # Weighted selection: 70% from Main Pool, 30% from Train-Only (if available)
+                if train_only and np.random.random() < 0.3:
+                    selected_voice = np.random.choice(train_only)
+                else:
+                    selected_voice = np.random.choice(pool)
             
             # Use synthesizer manager to get TTS and/or VC results
+            # We pass 'selected_voice' as 'voice_preset' to FORCE the choice
+            # We pass 'split' for split-aware VC selection (V4)
             tts_result, vc_result = synth_manager.synthesize(
                 chunk["audio"],
                 config.audio.target_sr,
-                transcript
+                transcript,
+                voice_preset=selected_voice,
+                split=split  # NEW: Required for split-aware VC
             )
             
             # Pick which synthetic to use based on strategy
+            # Note: if we forced a preset, pick_synthetic handles valid return gracefully
             syn_result = synth_manager.pick_synthetic(tts_result, vc_result)
             
             if syn_result is None:
@@ -181,6 +285,7 @@ def run_mozilla_cv_pipeline():
                 "duration": chunk["duration"],
                 # Track SNR based on quality tier
                 "snr_db": 15 if quality_tier == "noisy" else "",
+                "split": sample["split"], # Propagate split to chunk
             }
             
             # Generate real filename for pairing
@@ -206,7 +311,7 @@ def run_mozilla_cv_pipeline():
                 "source_real_file": f"real/{real_filename}",  # Link to real source
             })
     
-    print(f"\n  Sources loaded: {source_count}")
+    print(f"\\n  Sources loaded: {source_count}")
     print(f"  Skipped: {skip_count}")
     print(f"  Working set: {len(working_set)} samples")
     
@@ -214,15 +319,14 @@ def run_mozilla_cv_pipeline():
         print("[ERROR] No samples in working set!")
         return False
     
-    # ============== PHASE 6: SPLIT ==============
-    print("\n" + "-" * 40)
-    print("PHASE 6: Creating Speaker-Disjoint Splits")
-    print("-" * 40)
-    
-    working_set = create_speaker_disjoint_splits(working_set, config)
+    # ============== PHASE 6: SPLIT (Already done in Phase 1.5) ==============
+    # print("\\n" + "-" * 40)
+    # print("PHASE 6: Creating Speaker-Disjoint Splits")
+    # print("-" * 40)
+    # working_set = create_speaker_disjoint_splits(working_set, config)
     
     # ============== PHASE 7: VALIDATE ==============
-    print("\n" + "-" * 40)
+    print("\\n" + "-" * 40)
     print("PHASE 7: Validating Dataset")
     print("-" * 40)
     
@@ -231,14 +335,14 @@ def run_mozilla_cv_pipeline():
     print(report)
     
     # ============== PHASE 8: EXPORT ==============
-    print("\n" + "-" * 40)
+    print("\\n" + "-" * 40)
     print("PHASE 8: Exporting Dataset")
     print("-" * 40)
     
     export_stats = export_dataset(working_set, config)
 
     # ============== PHASE 9: FEATURE EXTRACTION ==============
-    print("\n" + "-" * 40)
+    print("\\n" + "-" * 40)
     print("PHASE 9: Feature Extraction")
     print("-" * 40)
     
@@ -313,7 +417,7 @@ def run_mozilla_cv_pipeline():
     estimated_seconds = (target_size_mb / throughput) if throughput > 0 else 0
     estimated_hours = estimated_seconds / 3600
     
-    print("\n" + "=" * 60)
+    print("\\n" + "=" * 60)
     print("MOZILLA CV PIPELINE COMPLETE!")
     print("=" * 60)
     print(f"Time: {elapsed:.1f} seconds")

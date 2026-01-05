@@ -162,16 +162,36 @@ class SynthesizerManager:
         
         # Load TTS models
         # Load TTS models (Coqui)
-        if hasattr(self.config.synthesis, 'tts_models'):
-            for model_name in self.config.synthesis.tts_models:
-                if model_name.startswith("edge-tts"):
-                    from pipeline.synthesizer.edge_tts_synthesizer import EdgeTTSSynthesizer
-                    synth = EdgeTTSSynthesizer(model_name, device)
-                else:
-                    synth = TTSSynthesizer(model_name, device)
-                
-                if synth.is_available():
-                    self.tts_synthesizers.append(synth)
+        # Load TTS models from Voice Pools (V3)
+        models_to_load = set()
+        
+        # 1. Collect from Voice Pools
+        if hasattr(self.config.synthesis, 'voice_pools'):
+            pools = self.config.synthesis.voice_pools
+            models_to_load.update(pools.train)
+            models_to_load.update(pools.test)
+            models_to_load.update(pools.val)
+            
+        # 2. Collect from Train-Only Models
+        if hasattr(self.config.synthesis, 'train_only_models'):
+            models_to_load.update(self.config.synthesis.train_only_models)
+            
+        # 3. Legacy Fallback (Deprecated)
+        if hasattr(self.config.synthesis, 'tts_models') and self.config.synthesis.tts_models:
+             print("[Synthesizer] WARNING: 'tts_models' is deprecated. Use 'voice_pools'.")
+             models_to_load.update(self.config.synthesis.tts_models)
+             
+        # Initialize unique models
+        for model_name in models_to_load:
+            if model_name.startswith("edge-tts"):
+                from pipeline.synthesizer.edge_tts_synthesizer import EdgeTTSSynthesizer
+                # Edge-TTS wrapper handles "edge-tts:Voice" parsing
+                synth = EdgeTTSSynthesizer(model_name, device)
+            else:
+                synth = TTSSynthesizer(model_name, device)
+            
+            if synth.is_available():
+                self.tts_synthesizers.append(synth)
         
         # Load Hugging Face Models (Bark/SpeechT5)
         if hasattr(self.config.synthesis, 'huggingface_models'):
@@ -183,11 +203,15 @@ class SynthesizerManager:
                     # We treat HF T2S models as TTS synthesizers
                     self.tts_synthesizers.append(synth)
         
-        # Load VC models
-        for model_name in self.config.synthesis.vc_models:
-            synth = VCSynthesizer(model_name, device)
-            if synth.is_available():
-                self.vc_synthesizers.append(synth)
+        # Load VC models (Respect Bypass Switch)
+        if not getattr(self.config.synthesis, 'enable_vc', False):
+             print("[Synthesizer] VC disabled by config (enable_vc=False). bypassing RVC/VC initialization.")
+             self.vc_synthesizers = [] # Explicitly empty
+        else:
+            for model_name in self.config.synthesis.vc_models:
+                synth = VCSynthesizer(model_name, device)
+                if synth.is_available():
+                    self.vc_synthesizers.append(synth)
         
         print(f"[Synthesizer] Initialized {len(self.tts_synthesizers)} TTS, "
               f"{len(self.vc_synthesizers)} VC models")
@@ -198,7 +222,9 @@ class SynthesizerManager:
         self,
         audio: np.ndarray,
         sr: int,
-        transcript: str
+        transcript: str,
+        voice_preset: Optional[str] = None,
+        split: Optional[str] = None  # NEW: Required for split-aware VC
     ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
         """
         Generate synthetic versions based on config strategy.
@@ -207,6 +233,7 @@ class SynthesizerManager:
             audio: Source audio
             sr: Sample rate
             transcript: Text transcript
+            voice_preset: Force specific model (bypass strategy)
             
         Returns:
             Tuple of (tts_result, vc_result) - each is dict with audio + metadata
@@ -218,18 +245,43 @@ class SynthesizerManager:
         vc_result = None
         
         # TTS synthesis
-        if strategy in ["random", "both", "tts_only"]:
+        # TTS synthesis
+        if voice_preset or strategy in ["random", "both", "tts_only"]:
             if self.tts_synthesizers:
-                # Use Coqui TTS if available
-                synth = random.choice(self.tts_synthesizers)
-                tts_audio = synth.synthesize(transcript)
+                # Select synthesizer
+                if voice_preset:
+                    # Forced selection: Find specific model instance matching preset
+                    # Try exact match first
+                    synth = next((s for s in self.tts_synthesizers if s.model_name == voice_preset), None)
+                    
+                    # If not exact, maybe it's a generic wrapper (like generic edge-tts) handling specific voice
+                    if synth is None and voice_preset.startswith("edge-tts:"):
+                         # Check for generic "edge-tts" loaded? 
+                         # Actually, in our new init loop, we init "edge-tts:VoiceName" as the model_name.
+                         # So exact match should work.
+                         pass
+                    
+                    if synth is None:
+                        # Fallback: Pick ANY synth that can handle it? No, strict.
+                        print(f"[Synthesizer] Error: Forced model '{voice_preset}' not found/loaded.")
+                        synth = None
+                else:
+                    # Random strategy
+                    synth = random.choice(self.tts_synthesizers)
                 
-                if tts_audio is not None:
-                    tts_result = {
-                        "audio": tts_audio,
-                        "generator": synth.model_name,
-                        "method": "tts"
-                    }
+                if synth:
+                    tts_audio = synth.synthesize(transcript)
+                
+                    if tts_audio is not None:
+                        tts_result = {
+                            "audio": tts_audio,
+                            "generator": synth.model_name,
+                            "method": "tts"
+                        }
+                        
+            # If voice_preset was handled successfully, we are done
+            if voice_preset and tts_result:
+                return tts_result, None
             
             # Try edge-tts first (pure Python, no DLL issues)
             if tts_result is None:
@@ -248,31 +300,27 @@ class SynthesizerManager:
                     print(f"[Synthesizer] Edge-TTS failed: {e}")
             
             # Fallback to gTTS if edge-tts failed
-            if tts_result is None:
-                try:
-                    from pipeline.synthesizer.gtts_synthesizer import synthesize_tts
-                    gtts_audio = synthesize_tts(transcript, sample_rate=sr)
-                    if gtts_audio is not None:
-                        import gtts
-                        tts_result = {
-                            "audio": gtts_audio,
-                            "generator": f"gTTS-{gtts.__version__}",
-                            "method": "tts"
-                        }
-                except Exception as e:
-                    print(f"[Synthesizer] gTTS fallback failed: {e}")
+            # STRICT MODE (V3 Disjoint Strategy):
+            # We CANNOT fallback to generic gTTS because it would leak the same voice into both Train and Test.
+            # If the specific selected voice fails, we must fail the synthesis and let the pipeline retry or skip.
+            # if tts_result is None:
+            #     try:
+            #         from pipeline.synthesizer.gtts_synthesizer import synthesize_tts
+            #         gtts_audio = synthesize_tts(transcript, sample_rate=sr)
+            #         if gtts_audio is not None:
+            #             import gtts
+            #             tts_result = {
+            #                 "audio": gtts_audio,
+            #                 "generator": f"gTTS-{gtts.__version__}",
+            #                 "method": "tts"
+            #             }
+            #     except Exception as e:
+            #         print(f"[Synthesizer] gTTS fallback failed: {e}")
         
-        # VC synthesis
-        if strategy in ["random", "both", "vc_only"] and self.vc_synthesizers:
-            synth = random.choice(self.vc_synthesizers)
-            vc_audio = synth.synthesize(audio, sr)
-            
-            if vc_audio is not None:
-                vc_result = {
-                    "audio": vc_audio,
-                    "generator": synth.model_name,
-                    "method": "vc"
-                }
+        # VC synthesis (SPLIT-AWARE - V4)
+        # Replaces legacy random.choice(self.vc_synthesizers) code
+        if strategy in ["random", "both", "vc_only"]:
+            vc_result = self._synthesize_vc_split_aware(audio, sr, split)
         
         # Normalization (Crucial for fairness with real audio)
         from pipeline.standardizer.preprocessor import rms_normalize, trim_silence
@@ -294,6 +342,88 @@ class SynthesizerManager:
             vc_result["audio"] = audio
         
         return tts_result, vc_result
+    
+    def _synthesize_vc_split_aware(
+        self,
+        audio: np.ndarray,
+        sr: int,
+        split: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Select VC model from split-appropriate pool and synthesize.
+        
+        DISJOINT GUARANTEE: Train/Test/Val pools are completely separate.
+        Unknown splits are REJECTED to prevent accidental leakage.
+        
+        Args:
+            audio: Source audio
+            sr: Sample rate
+            split: Must be 'train', 'val', or 'test'
+            
+        Returns:
+            Dict with audio, generator (normalized path), and method='vc', or None
+        """
+        # Check master switch
+        if not getattr(self.config.synthesis, 'enable_vc', False):
+            return None
+        
+        # Get VC pools config
+        pools = getattr(self.config.synthesis, 'vc_pools', None)
+        if pools is None:
+            print("[VC] No vc_pools configured, skipping VC")
+            return None
+        
+        # STRICT SPLIT HANDLING - NEVER default to train for unknown
+        if split not in ['train', 'val', 'test']:
+            print(f"[VC] WARNING: Unknown split '{split}', skipping VC to prevent leakage")
+            return None
+        
+        # Select pool based on split
+        if split == "test":
+            pool = pools.test
+        elif split == "val":
+            pool = pools.val
+        else:  # train
+            pool = pools.train
+        
+        if not pool:
+            print(f"[VC] No models in {split} pool, skipping VC")
+            return None
+        
+        # Select model (random from pool)
+        model_path = random.choice(pool)
+        
+        # Normalize path for consistent tracking
+        from pathlib import Path
+        normalized_path = Path(model_path).resolve().as_posix()
+        
+        # Security scan before loading (fail-safe)
+        try:
+            from pipeline.utils.pth_security import is_safe_to_load
+            if not is_safe_to_load(model_path):
+                print(f"[VC] SECURITY: Model {model_path} failed safety scan, skipping")
+                return None
+        except ImportError:
+            # Module not available - proceed with warning
+            print("[VC] WARNING: pth_security module not available, proceeding without scan")
+        
+        # Perform voice conversion
+        try:
+            from pipeline.synthesizer.rvc_synthesizer import synthesize_vc
+            vc_device = self.config.synthesis.vc_device
+            vc_audio = synthesize_vc(audio, sr, model_path, vc_device)
+            
+            if vc_audio is not None:
+                return {
+                    "audio": vc_audio,
+                    "generator": normalized_path,  # Use normalized path for consistency
+                    "method": "vc"
+                }
+            return None
+            
+        except Exception as e:
+            print(f"[VC] Voice conversion failed: {e}")
+            return None
     
     def pick_synthetic(
         self,

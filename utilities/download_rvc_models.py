@@ -1,111 +1,167 @@
 """
-RVC Model Downloader
+RVC Model Downloader (Robust)
 
-Downloads a standard set of community RVC models for research/testing purposes.
-Models selected to represent diverse vocal characteristics (Gender/Pitch/Timbre).
+Downloads RVC models defined in 'utilities/rvc_model_registry.yaml'.
+Uses the centralized HFClient for robust downloads with integrity checks.
 
-Models:
-1. Dua Lipa (Female, Pop)
-2. Taylor Swift (Female, Clear)
-3. Ed Sheeran (Male, Soft)
-4. Kanye West (Male, Deep)
+Usage:
+    python utilities/download_rvc_models.py
 """
 
-import os
-import requests
-import zipfile
+import sys
+import yaml
 import shutil
+import zipfile
+import requests
 from pathlib import Path
-from tqdm import tqdm
+from typing import Dict, List, Any
 
-# Mapping: Model Name -> Download URL
-MODELS = {
-    "DuaLipa": "https://huggingface.co/gilliaaan/DuaLipa/resolve/main/DuaLipa.zip",
-    "TaylorSwift": "https://huggingface.co/bennetJL/TaylorSwift/resolve/main/TaylorSwift2024.zip?download=true",
-    "EdSheeran": "https://huggingface.co/SUP3RMASS1VE/Ed-Sheeran/resolve/main/Ed%20Sheeran.zip?download=true",
-    "KanyeWest": "https://huggingface.co/TheRealheavy/KanyeWestGraduationEra/resolve/main/KanyeWestGraduation.zip?download=true"
-}
+# Add repo root to path to import pipeline modules
+REPO_ROOT = Path(__file__).parent.parent
+sys.path.append(str(REPO_ROOT))
 
-MODELS_DIR = Path(__file__).parent.parent / "models" / "rvc"
+try:
+    from pipeline.utils.huggingface_hub import HFClient, HFDownloadResult
+    from pipeline.utils.pth_security import scan_pth_file, quarantine_file
+except ImportError:
+    print("❌ Critical: pipeline.utils not found. Run from repo root.")
+    sys.exit(1)
 
-def download_file(url, dest_path):
-    """Download file with progress bar."""
-    response = requests.get(url, stream=True)
-    total_size = int(response.headers.get('content-length', 0))
-    block_size = 1024 * 1024  # 1MB
+REGISTRY_PATH = REPO_ROOT / "utilities" / "rvc_model_registry.yaml"
+MODELS_ROOT = REPO_ROOT / "models" / "rvc"
+
+
+def load_registry() -> Dict[str, Any]:
+    if not REGISTRY_PATH.exists():
+        print(f"❌ Registry not found at {REGISTRY_PATH}")
+        sys.exit(1)
+    with open(REGISTRY_PATH, 'r') as f:
+        return yaml.safe_load(f)
+
+
+def extract_zip(zip_path: Path, extract_to: Path) -> bool:
+    """Extract zip file to destination."""
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall(extract_to)
+        return True
+    except Exception as e:
+        print(f"   ❌ Extraction failed: {e}")
+        return False
+
+
+def process_model(client: HFClient, model: Dict[str, Any], group: str):
+    """Download and install a single model."""
+    model_id = model['id']
+    url = model['url']
     
-    with open(dest_path, "wb") as file, tqdm(
-        desc=dest_path.name,
-        total=total_size,
-        unit='iB',
-        unit_scale=True,
-        unit_divisor=1024,
-    ) as bar:
-        for data in response.iter_content(block_size):
-            size = file.write(data)
-            bar.update(size)
-
-def setup_models():
-    print(f"🚀 Setting up RVC Models in {MODELS_DIR}...")
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    # RVC models are usually hosted as direct file links or HF resolve links
+    # We parse the URL to get repo_id and filename for HFClient
+    # Expected format: https://huggingface.co/{repo_id}/resolve/main/{filename}
     
-    for name, url in MODELS.items():
-        model_folder = MODELS_DIR / name
-        if model_folder.exists() and (model_folder / f"{name}.pth").exists():
-            print(f"✅ {name} already exists. Skipping.")
-            continue
-            
-        print(f"\n📥 Downloading {name}...")
-        zip_path = MODELS_DIR / f"{name}.zip"
+    print(f"\n📦 Processing [{group}] {model_id}...")
+    
+    if "huggingface.co" not in url:
+        print(f"   ⚠️ Only HuggingFace URLs supported currently. Skipping {url}")
+        return
+
+    try:
+        # naive parsing of HF url
+        parts = url.split("huggingface.co/")[-1].split("/")
+        repo_id = f"{parts[0]}/{parts[1]}"
         
-        try:
-            download_file(url, zip_path)
+        # Handle /resolve/main/ or /blob/main/
+        if "resolve" in parts:
+            idx = parts.index("resolve")
+            revision = parts[idx+1]
+            filename = "/".join(parts[idx+2:]).split("?")[0] # remove query params
+        elif "blob" in parts:
+            idx = parts.index("blob")
+            revision = parts[idx+1]
+            filename = "/".join(parts[idx+2:]).split("?")[0]
+        else:
+            print(f"   ⚠️ Could not parse HF URL: {url}")
+            return
             
-            print(f"📦 Extracting {name}...")
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                # Extract to a temp extracted folder first to handle weird zip structures
-                extract_root = MODELS_DIR / f"{name}_extracted"
-                zip_ref.extractall(extract_root)
-                
-                # Find the .pth and .index files
-                pth_files = list(extract_root.rglob("*.pth"))
-                index_files = list(extract_root.rglob("*.index"))
-                
-                if not pth_files:
-                    print(f"❌ Error: No .pth file found in {name} zip!")
-                    continue
-                
-                # Move files to final folder
-                model_folder.mkdir(exist_ok=True)
-                
-                # Move main model (rename to match folder for simplicity)
-                source_pth = pth_files[0] # Take largest if multiple? Usually just one.
-                # Heuristic: Take the largest pth file (often there are small G/D files for training)
-                if len(pth_files) > 1:
-                     source_pth = max(pth_files, key=lambda p: p.stat().st_size)
-                
-                shutil.move(str(source_pth), str(model_folder / f"{name}.pth"))
-                print(f"   -> Secured model: {name}.pth")
-                
-                # Move index if exists
-                if index_files:
-                    source_index = max(index_files, key=lambda p: p.stat().st_size) # Best index
-                    shutil.move(str(source_index), str(model_folder / f"{name}.index"))
-                    print(f"   -> Secured index: {name}.index")
-                
-            # Cleanup
-            zip_path.unlink()
-            shutil.rmtree(extract_root)
-            print(f"✅ Installed {name}")
-            
-        except Exception as e:
-            print(f"❌ Failed to install {name}: {e}")
-            if zip_path.exists():
-                zip_path.unlink()
-            if (MODELS_DIR / f"{name}_extracted").exists():
-                shutil.rmtree(MODELS_DIR / f"{name}_extracted")
+        unquoted_filename = requests.utils.unquote(filename)
+        
+    except Exception as e:
+        print(f"   ⚠️ URL parse error: {e}")
+        return
 
-    print("\n✨ All RVC models setup complete!")
+    # Target directory: models/rvc/{model_id}/
+    target_dir = MODELS_ROOT / model_id
+    if target_dir.exists() and any(target_dir.glob("*.pth")):
+        print(f"   ✅ Already installed in {target_dir}")
+        return
+
+    # Download
+    print(f"   ⬇️ Downloading {unquoted_filename} from {repo_id}...")
+    result = client.download_file(
+        repo_id=repo_id,
+        filename=unquoted_filename,
+        revision=revision,
+        check_integrity=True
+    )
+    
+    if not result.success:
+        print(f"   ❌ Download failed: {result.error}")
+        return
+        
+    # Extract
+    print(f"   📂 Extracting to {target_dir}...")
+    target_dir.mkdir(parents=True, exist_ok=True)
+    
+    if str(result.local_path).endswith('.zip'):
+        success = extract_zip(result.local_path, target_dir)
+        if not success:
+            return
+    else:
+        # It's a direct .pth file?
+        shutil.copy(result.local_path, target_dir / result.local_path.name)
+        
+    # Security Scan
+    print("   🛡️ Scanning content...")
+    pth_files = list(target_dir.glob("**/*.pth"))
+    for pth in pth_files:
+        scan = scan_pth_file(pth)
+        if not scan.is_safe:
+            print(f"   🚨 SECURITY WARNING: {pth.name} flagged!")
+            print(f"      Issues: {scan.issues}")
+            # Quarantine
+            quarantine_file(pth, MODELS_ROOT / "quarantine")
+        else:
+            print(f"      ✅ {pth.name} passed scan.")
+
+
+def main():
+    import requests # needed for unquote
+    
+    print("="*60)
+    print("RVC Model Manager")
+    print("="*60)
+    
+    client = HFClient()
+    if not client.is_available():
+        print("❌ huggingface_hub not installed.")
+        return
+
+    registry = load_registry()
+    
+    # Process Baseline
+    for model in registry.get('baseline', []):
+        process_model(client, model, "BASELINE")
+        
+    # Process Verified Expansion
+    for model in registry.get('expansion', []):
+        if model.get('status') == 'verified':
+            process_model(client, model, "EXPANSION")
+        else:
+            print(f"\n⏭️ Skipping unverified model: {model['id']}")
+
+    print("\n" + "="*60)
+    print("Done.")
+
 
 if __name__ == "__main__":
-    setup_models()
+    main()

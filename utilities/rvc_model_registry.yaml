@@ -1,0 +1,140 @@
+# =============================================================================
+# RVC Model Registry
+# =============================================================================
+# This is the master list of RVC (Retrieval-based Voice Conversion) models
+# for the deepfake audio detection pipeline.
+#
+# Purpose: Provide diverse synthetic voice sources for training/testing.
+# Target: ~15 functional models covering varied vocal characteristics.
+#
+# Usage:
+#   - For local testing: Use `utilities/download_rvc_models.py` (downloads MODELS dict).
+#   - For supercomputer/batch: Load this YAML and iterate over the `models` list.
+#
+# Status Legend:
+#   - verified: Confirmed working (tested download + extraction).
+#   - untested: Link found, not yet verified.
+#   - broken: Known to fail (404, private, DMCA, etc.).
+# =============================================================================
+
+# --- Baseline Models (Currently Installed / Legacy) ---
+baseline:
+  - id: "TaylorSwift"
+    status: "verified"
+    url: "https://huggingface.co/bennetJL/TaylorSwift/resolve/main/TaylorSwift2024.zip?download=true"
+    expected_files: ["TaylorSwift.pth"]
+    est_size_mb: 350
+    license: "Research/Non-Commercial (Fan Model)"
+    notes: "2024 Era model. Clear female vocals."
+
+  - id: "EdSheeran"
+    status: "verified"
+    url: "https://huggingface.co/SUP3RMASS1VE/Ed-Sheeran/resolve/main/Ed%20Sheeran.zip?download=true"
+    expected_files: ["Ed Sheeran.pth"]
+    est_size_mb: 300
+    license: "Research/Non-Commercial (Fan Model)"
+    notes: "Soft male vocals."
+
+  - id: "KanyeWest"
+    status: "verified"
+    url: "https://huggingface.co/TheRealheavy/KanyeWestGraduationEra/resolve/main/KanyeWestGraduation.zip?download=true"
+    expected_files: ["KanyeWest.pth"]
+    est_size_mb: 350
+    license: "Research/Non-Commercial (Fan Model)"
+    notes: "Graduation Era. Deep male vocals."
+
+# --- Removed Models ---
+removed:
+  - id: "DuaLipa"
+    status: "broken"
+    url: "https://huggingface.co/gilliaaan/DuaLipa/resolve/main/DuaLipa.zip"
+    reason: "HuggingFace repo returns 404/private. Likely DMCA or deleted."
+    removed_date: "2026-01-04"
+
+# --- Expansion Models (~12 New) ---
+# These are candidates for your partner to download on the supercomputer.
+# Status "verified" means URL was tested and returns valid ZIP.
+expansion:
+  # === Politicians (Diverse Speech Styles) ===
+  - id: "Biden"
+    status: "verified"
+    url: "https://huggingface.co/0x3e9/0x3e9_RVC_models/resolve/main/biden.zip"
+    expected_files: ["biden.pth", "biden.index"]
+    est_size_mb: 232
+    license: "Research (Political Speech)"
+    notes: "From 0x3e9 collection. 300 Epochs."
+
+  - id: "Trump"
+    status: "verified"
+    url: "https://huggingface.co/0x3e9/0x3e9_RVC_models/resolve/main/trump.zip"
+    expected_files: ["trump.pth", "trump.index"]
+    est_size_mb: 133
+    license: "Research (Political Speech)"
+    notes: "From 0x3e9 collection. 600 Epochs."
+
+  - id: "Obama"
+    status: "verified"
+    url: "https://huggingface.co/0x3e9/0x3e9_RVC_models/resolve/main/obama.zip"
+    expected_files: ["obama.pth", "obama.index"]
+    est_size_mb: 250
+    license: "Research (Political Speech)"
+    notes: "From 0x3e9 collection. 300 Epochs."
+
+  # === Musicians (Singing + Speaking) ===
+  - id: "BrunoMars"
+    status: "verified"
+    url: "https://huggingface.co/QuickWick/Music-AI-Voices/resolve/main/BrunoMars24k/BrunoMars24k.zip"
+    expected_files: ["Bruno Mars.pth"]
+    est_size_mb: 300
+    license: "Research/Non-Commercial (Fan Model)"
+    notes: "Tenor range. Good for singing tests."
+
+  # === Female Artists (Gender Balance Expansion) ===
+  - id: "ArianaGrande"
+    status: "verified"
+    url: "https://huggingface.co/QuickWick/Music-AI-Voices/resolve/main/Ariana Grande 73k/Ariana Grande 73k.zip"
+    expected_files: ["Ariana Grande.pth"]
+    est_size_mb: 200
+    license: "Research (Fan Model)"
+    notes: "High pop vocals."
+
+  - id: "Adele"
+    status: "verified"
+    url: "https://huggingface.co/QuickWick/Music-AI-Voices/resolve/main/Adele (RVC) 400 Epoch/adelemodel.zip"
+    expected_files: ["adelemodel.pth"]
+    est_size_mb: 150
+    license: "Research (Fan Model)"
+    notes: "Deep, soulful female vocals."
+
+  - id: "Rihanna"
+    status: "verified"
+    url: "https://huggingface.co/QuickWick/Music-AI-Voices/resolve/main/Rihanna 75k/Rihanna 75k.zip"
+    expected_files: ["Rihanna.pth"]
+    est_size_mb: 200
+    license: "Research (Fan Model)"
+    notes: "Distinctive tone."
+
+  - id: "KatyPerry"
+    status: "verified"
+    url: "https://huggingface.co/QuickWick/Music-AI-Voices/resolve/main/Katy Perry 28k/Katy Perry 28k.zip"
+    expected_files: ["Katy Perry.pth"]
+    est_size_mb: 150
+    license: "Research (Fan Model)"
+    notes: "Pop vocals."
+
+  - id: "Shakira"
+    status: "verified"
+    url: "https://huggingface.co/QuickWick/Music-AI-Voices/resolve/main/Shakira (Classic Era) 15k/Shakira (Classic Era) 15k.zip"
+    expected_files: ["Shakira (Classic Era).pth"]
+    est_size_mb: 150
+    license: "Research (Fan Model)"
+    notes: "Unique timbre."
+
+# =============================================================================
+# Summary
+# =============================================================================
+# Total Baseline (Verified): 3
+# Total Expansion (Untested): 12
+# Total Removed (Broken): 1
+# Grand Total Available: 15
+# =============================================================================

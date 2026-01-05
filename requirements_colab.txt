@@ -37,4 +37,6 @@ nest_asyncio
 
 # Feature Extraction (GPU)
 nnAudio>=0.3.2
-torchaudio>=2.0.0
+
+# External Data
+huggingface_hub>=0.16.0
