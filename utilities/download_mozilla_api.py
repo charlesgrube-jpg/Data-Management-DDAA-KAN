@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 # API Configuration - CREDENTIALS REQUESTED AT RUNTIME
-API_KEY = ""
+API_KEY = "0c2b0f9b9635a63a6039b730839fcfdafdfad24c0c7cb49d0ad44937d663f854"
 CLIENT_ID = "mdc_e271ec33f12df105e4210e9d0dde9458" # Default client ID often works
 DOWNLOAD_TOKEN = ""
 
@@ -24,6 +24,8 @@ API_BASE = "https://datacollective.mozillafoundation.org/api/datasets"
 
 def get_credentials():
     global API_KEY, DOWNLOAD_TOKEN
+    if API_KEY:
+        return
     print("\n🔐 Mozilla Data Collective Credentials Required")
     API_KEY = input("Enter your Bearer Token (API Key): ").strip()
     DOWNLOAD_TOKEN = input("Enter your Download Token (dlt_...): ").strip()
@@ -213,11 +215,11 @@ def main():
     else:
         print("\n[1/3] Using provided Download Token (Skipping session creation)")
     
-    print(f"      Token: {str(download_token)[:50]}...")
+    print(f"      Token: {download_token}")
     
     # Step 2: Download (7GB Partial)
     output_path = output_dir / "common_voice_sample.tar.gz"
-    max_bytes = 7 * 1024 * 1024 * 1024  # 7 GB partial download
+    max_bytes = 8 * 1024 * 1024 * 1024  # 8 GB partial download
     
     success = download_with_token(download_token, str(output_path), max_bytes)
     

@@ -8,9 +8,10 @@ source:
   dataset_name: "mozilla-foundation/common_voice_13_0"
   language: "en"
   split: "train"  # Use train.tsv
-  max_samples: 5  # Use up to 5 of the available clips
+  split: "train"  # Use train.tsv
+  max_samples: null  # Process ALL available clips
   cache_dir: "./cache"
-  streaming: true   # Stream data to avoid downloading 80GB+
+  streaming: false   # Use local files only
   data_path: "mozilla_cv_data/cv-corpus-24.0-2025-12-05/en" # Default path, override in Colab
 
 # --- Audio Processing ---
@@ -105,3 +106,7 @@ features:
     n_filters: 128
     n_fft: 512
     hop_length: 256
+
+# --- Execution ---
+execution:
+  num_workers: 8  # Parallel workers for data generation

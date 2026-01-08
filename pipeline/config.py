@@ -115,6 +115,11 @@ class FeaturesConfig:
 
 
 @dataclass
+class ExecutionConfig:
+    num_workers: int = 1
+
+
+@dataclass
 class Config:
     """Master configuration container."""
     source: SourceConfig
@@ -128,6 +133,7 @@ class Config:
     output: OutputConfig
     validation: ValidationConfig
     features: FeaturesConfig
+    execution: ExecutionConfig
     seed: Optional[int]
     
     def set_seed(self):
@@ -179,6 +185,7 @@ def load_config(config_path: str = "config.yaml") -> Config:
             cqt=CQTConfig(**raw['features']['cqt']),
             lfcc=LFCCConfig(**raw['features']['lfcc'])
         ),
+        execution=ExecutionConfig(**raw.get('execution', {'num_workers': 1})),
         seed=raw.get('seed')
     )
     

@@ -1,0 +1,99 @@
+# ============================================================
+# Dataset Pipeline Configuration
+# ============================================================
+# All parameters centralized here. Set seed for reproducibility.
+
+# --- Dataset Source ---
+source:
+  dataset_name: "mozilla-foundation/common_voice_13_0"
+  language: "en"
+  split: "train"  # Use train.tsv
+  max_samples: 50  # Use up to 50 of the 67 available clips
+  cache_dir: "./cache"
+  streaming: true   # Stream data to avoid downloading 80GB+
+  data_path: "mozilla_cv_data/cv-corpus-24.0-2025-12-05/en" # Default path, override in Colab
+
+# --- Audio Processing ---
+audio:
+  target_sr: 16000           # Sample rate in Hz
+  normalize_db: -20          # RMS normalization target (dBFS)
+  silence_threshold_db: 40   # For trimming (higher = more aggressive)
+  min_duration: 1.0          # Minimum chunk duration (seconds)
+  max_duration: 10.0         # Maximum source audio duration (skip longer)
+
+# --- Segmentation ---
+segmentation:
+  chunk_duration: 3.0        # Target chunk duration (seconds)
+  overlap: 0.0               # Overlap ratio (0.0 = no overlap)
+  pad_last_chunk: true       # Pad if last chunk is shorter
+
+# --- Synthesis ---
+synthesis:
+  tts_models: []              # Empty = use gTTS fallback (no DLL issues)
+  vc_models:                  # Enable downloaded RVC models
+    - "models/rvc/TaylorSwift/TaylorSwift.pth"
+    - "models/rvc/EdSheeran/EdSheeran.pth"
+    - "models/rvc/KanyeWest/KanyeWest.pth"
+  vc_device: "cuda:0"         # "cuda:0" for cluster (Mac will auto-fallback to CPU)
+  pick_strategy: "random"     # Use both TTS and RVC randomly
+  fallback_on_error: false
+
+# --- Channel Effects ---
+effects:
+  enabled: true
+  quality_distribution:
+    clean: 0.40              # No degradation
+    mobile: 0.40             # Light compression + mild noise
+    noisy: 0.20              # Background noise + reverb
+  apply_same_to_pair: true   # Same effect tier to real + synthetic
+
+# --- Codec Compression ---
+codec_compression:
+  enabled: true  # Enabled: will skip gracefully if ffmpeg not found locally
+  apply_to: "all"            # "all", "synthetic_only", "none"
+  codec_distribution:
+    none: 0.30               # No codec compression (30%)
+    mp3_64k: 0.20            # Voice message quality (20%)
+    opus_48k: 0.20           # VoIP quality - WhatsApp, Discord (20%)
+    aac_96k: 0.15            # Medium streaming quality (15%)
+    aac_128k: 0.15           # High streaming - YouTube, social (15%)
+  apply_after_effects: true  # Apply codec after channel effects
+
+# --- Data Splits ---
+splits:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+
+# --- Output ---
+output:
+  base_dir: "./processed_dataset"
+  audio_format: "wav"
+  metadata_file: "metadata.csv"
+  save_transcripts: true
+
+# --- Reproducibility ---
+seed: 42                     # Set to null for random
+
+# --- Validation ---
+validation:
+  check_balance: true
+  balance_tolerance: 0.10    # Allow 40-60% for small datasets
+  check_duplicates: false    # Disabled: real+synthetic pairs share same base
+  check_speaker_leakage: true
+  min_samples_per_split: 10  # Lowered for small test dataset
+
+# --- Feature Extraction ---
+features:
+  type: "cqt"                # "cqt" or "lfcc"
+  device: "auto"             # "auto", "cpu", or "cuda"
+  output_format: "pt"        # "pt" (PyTorch) or "npy" (NumPy)
+  cqt:
+    n_bins: 84               # 7 octaves
+    hop_length: 512
+    fmin: 32.7               # C1
+  lfcc:
+    n_lfcc: 60
+    n_filters: 128
+    n_fft: 512
+    hop_length: 256
