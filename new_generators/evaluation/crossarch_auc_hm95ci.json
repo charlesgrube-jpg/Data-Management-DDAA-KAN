@@ -1,0 +1,117 @@
+{
+  "_meta": {
+    "method": "Hanley-McNeil-1982",
+    "z": 1.96,
+    "sizes": {
+      "Bark": [
+        500,
+        500
+      ],
+      "MMS-TTS": [
+        2000,
+        2000
+      ],
+      "SpeechT5": [
+        2000,
+        2000
+      ]
+    },
+    "note": "Approximate AUC CIs when per-sample score vectors are unavailable; assumes balanced real/fake counts per generator (cross-arch eval logs). Prefer percentile bootstrap from stored scores when both classes are logged."
+  },
+  "Bark": {
+    "Transformer": {
+      "auc": 0.4853,
+      "auc_ci95_lo": 0.4495,
+      "auc_ci95_hi": 0.5211,
+      "auc_se_hm": 0.018257
+    },
+    "KAN": {
+      "auc": 0.5682,
+      "auc_ci95_lo": 0.5328,
+      "auc_ci95_hi": 0.6036,
+      "auc_se_hm": 0.018058
+    },
+    "PINN": {
+      "auc": 0.4414,
+      "auc_ci95_lo": 0.4059,
+      "auc_ci95_hi": 0.4769,
+      "auc_se_hm": 0.018113
+    },
+    "AASIST (FT)": {
+      "auc": 0.5328,
+      "auc_ci95_lo": 0.4971,
+      "auc_ci95_hi": 0.5685,
+      "auc_se_hm": 0.018219
+    },
+    "RawNet2 (FT)": {
+      "auc": 0.4726,
+      "auc_ci95_lo": 0.4369,
+      "auc_ci95_hi": 0.5083,
+      "auc_se_hm": 0.018233
+    }
+  },
+  "MMS-TTS": {
+    "Transformer": {
+      "auc": 0.3252,
+      "auc_ci95_lo": 0.3087,
+      "auc_ci95_hi": 0.3417,
+      "auc_se_hm": 0.008435
+    },
+    "KAN": {
+      "auc": 0.3781,
+      "auc_ci95_lo": 0.3609,
+      "auc_ci95_hi": 0.3953,
+      "auc_se_hm": 0.008795
+    },
+    "PINN": {
+      "auc": 0.3944,
+      "auc_ci95_lo": 0.377,
+      "auc_ci95_hi": 0.4118,
+      "auc_se_hm": 0.008879
+    },
+    "AASIST (FT)": {
+      "auc": 0.5811,
+      "auc_ci95_lo": 0.5635,
+      "auc_ci95_hi": 0.5987,
+      "auc_se_hm": 0.008983
+    },
+    "RawNet2 (FT)": {
+      "auc": 0.3053,
+      "auc_ci95_lo": 0.2891,
+      "auc_ci95_hi": 0.3215,
+      "auc_se_hm": 0.008264
+    }
+  },
+  "SpeechT5": {
+    "Transformer": {
+      "auc": 0.2709,
+      "auc_ci95_lo": 0.2554,
+      "auc_ci95_hi": 0.2864,
+      "auc_se_hm": 0.007919
+    },
+    "KAN": {
+      "auc": 0.4296,
+      "auc_ci95_lo": 0.4119,
+      "auc_ci95_hi": 0.4473,
+      "auc_se_hm": 0.009019
+    },
+    "PINN": {
+      "auc": 0.5668,
+      "auc_ci95_lo": 0.5491,
+      "auc_ci95_hi": 0.5845,
+      "auc_se_hm": 0.00903
+    },
+    "AASIST (FT)": {
+      "auc": 0.7492,
+      "auc_ci95_lo": 0.7341,
+      "auc_ci95_hi": 0.7643,
+      "auc_se_hm": 0.007687
+    },
+    "RawNet2 (FT)": {
+      "auc": 0.6706,
+      "auc_ci95_lo": 0.654,
+      "auc_ci95_hi": 0.6872,
+      "auc_se_hm": 0.008469
+    }
+  }
+}

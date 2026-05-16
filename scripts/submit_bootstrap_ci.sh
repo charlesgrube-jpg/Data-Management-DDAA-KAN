@@ -1,0 +1,22 @@
+#!/bin/bash
+#SBATCH --job-name=bootstrap_ci
+#SBATCH --partition=day
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=02:00:00
+#SBATCH --account=pi_ev6
+#SBATCH --output=/home/ms4726/project_pi_ev6/ms4726/Data-Management-DDAA-KAN/logs/bootstrap_ci_%j.out
+
+echo "Bootstrap CI | Job: $SLURM_JOB_ID | Node: $(hostname) | Start: $(date)"
+
+module load miniconda
+source /apps/software/system/software/miniconda/24.11.3/etc/profile.d/conda.sh
+conda activate ddaa
+
+export PYTHONPATH="/home/ms4726/project_pi_ev6/ms4726/Data-Management-DDAA-KAN:${PYTHONPATH:-}"
+
+cd /home/ms4726/project_pi_ev6/ms4726/Data-Management-DDAA-KAN
+
+python scripts/regen_bootstrap_ci.py
+
+echo "Done: $(date)"

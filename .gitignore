@@ -50,3 +50,21 @@ Thumbs.db
 
 # Feature output directories (generated)
 features_*/
+
+# Claude internal
+.claude/
+.claire/
+CLAUDE.md
+
+# Large model/checkpoint dirs
+models/
+checkpoints/
+
+# Generated analysis/results
+interpretability_figures/
+interpretability_review/
+robustness_results/
+
+# Generated artifacts
+*.png
+*.out

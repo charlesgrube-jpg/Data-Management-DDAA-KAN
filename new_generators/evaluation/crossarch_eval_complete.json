@@ -1,0 +1,68 @@
+{
+  "Bark": {
+    "Transformer": {
+      "auc": 0.4853,
+      "eer_pct": 50.8
+    },
+    "KAN": {
+      "auc": 0.5682,
+      "eer_pct": 43.6
+    },
+    "PINN": {
+      "auc": 0.4414,
+      "eer_pct": 58.2
+    },
+    "AASIST (FT)": {
+      "auc": 0.5328,
+      "eer_pct": 47.8
+    },
+    "RawNet2 (FT)": {
+      "auc": 0.4726,
+      "eer_pct": 52.4
+    }
+  },
+  "MMS-TTS": {
+    "Transformer": {
+      "auc": 0.3252,
+      "eer_pct": 63.45
+    },
+    "KAN": {
+      "auc": 0.3781,
+      "eer_pct": 60.55
+    },
+    "PINN": {
+      "auc": 0.3944,
+      "eer_pct": 58.8
+    },
+    "AASIST (FT)": {
+      "auc": 0.5811,
+      "eer_pct": 43.7
+    },
+    "RawNet2 (FT)": {
+      "auc": 0.3053,
+      "eer_pct": 61.9
+    }
+  },
+  "SpeechT5": {
+    "Transformer": {
+      "auc": 0.2709,
+      "eer_pct": 70.5
+    },
+    "KAN": {
+      "auc": 0.4296,
+      "eer_pct": 54.9
+    },
+    "PINN": {
+      "auc": 0.5668,
+      "eer_pct": 43.05
+    },
+    "AASIST (FT)": {
+      "auc": 0.7492,
+      "eer_pct": 31.65
+    },
+    "RawNet2 (FT)": {
+      "auc": 0.6706,
+      "eer_pct": 38.15
+    }
+  }
+}

@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import scipy.io.wavfile as wav
 import tempfile
+from typing import Optional
 from .base import BaseSynthesizer
 
 # Try imports (transformers might not be installed)
@@ -34,7 +35,7 @@ class HuggingFaceSynthesizer(BaseSynthesizer):
         self._tokenizer = None # For MMS
 
         if not TRANSFORMERS_AVAILABLE:
-            print(f"⚠️ Transformers not installed. Skipping {model_name}.")
+            print(f"Transformers not installed. Skipping {model_name}.")
             return
 
     def is_available(self) -> bool:
