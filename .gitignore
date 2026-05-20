@@ -68,3 +68,5 @@ robustness_results/
 # Generated artifacts
 *.png
 *.out
+*.index
+models/
