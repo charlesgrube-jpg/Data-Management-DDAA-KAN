@@ -1,0 +1,79 @@
+# Croissant metadata exports (large)
+ddaa_croissant.json
+ddaa_croissant.zip
+
+# Data directories (large, downloaded)
+mozilla_cv_data/
+speech_commands_data/
+test_samples/
+test_samples_cv/
+test_samples_libri/
+test_samples_real/
+cache/
+
+# Output directories (generated, timestamped)
+processed_dataset/
+processed_dataset_*/
+processed_tts/
+
+# Model files (downloaded, large)
+rvc_models/
+*.pth
+# Note: .pt files (PyTorch tensors) not ignored - needed for feature outputs
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.eggs/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.temp
+*.log
+temp_omegaconf/
+
+# Virtual environments (additional)
+.venv_croissant/
+
+# Feature output directories (generated)
+features_*/
+
+# Claude internal
+.claude/
+.claire/
+CLAUDE.md
+
+# Large model/checkpoint dirs (root-level only, not pipeline/models/)
+/models/
+checkpoints/
+
+# Generated analysis/results
+interpretability_figures/
+interpretability_review/
+robustness_results/
+
+# Generated artifacts
+*.png
+*.out
+*.index

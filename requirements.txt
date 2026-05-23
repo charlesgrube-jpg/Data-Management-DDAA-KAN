@@ -1,0 +1,35 @@
+# Audio Deepfake Detection Dataset Pipeline
+# Dependencies - Clean, minimal setup
+
+# Core audio processing
+librosa>=0.10.0
+soundfile>=0.12.0
+numpy>=1.22.0
+scipy>=1.10.0
+tqdm>=4.65.0
+
+# Feature Extraction
+torchaudio>=2.0.0
+
+# Configuration
+pyyaml>=6.0
+
+# Data handling
+pandas>=1.5.0
+
+# Text-to-Speech
+edge-tts>=7.0.0        # Microsoft Neural TTS (primary, high quality)
+gTTS>=2.5.0            # Google TTS (fallback)
+
+# Audio effects
+pydub>=0.25.0          # For codec compression (requires ffmpeg)
+
+# Optional - Voice Conversion (requires Docker/Linux due to DLL conflicts on Windows)
+# rvc-python>=0.1.0    # Uncomment in Docker environment
+# TTS>=0.17.0          # Coqui TTS - uncomment in Docker environment
+
+# System Requirements:
+# - ffmpeg: Required for codec compression
+#   Linux: apt install ffmpeg
+#   macOS: brew install ffmpeg
+#   Windows: Download from https://ffmpeg.org/download.html
