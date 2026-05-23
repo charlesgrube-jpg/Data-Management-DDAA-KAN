@@ -97,10 +97,11 @@ This document explains exactly how a single audio file travels through the code,
 
 ---
 
-### Step 10: Feature Extraction
-**File:** `pipeline/features/extract_features.py`
-**Purpose:** The Translator.
-*   Takes the final WAV files.
-*   Converts them into **CQT Spectrograms** or **LFCC** features.
-*   Saves as `.pt` (PyTorch tensors) ready for model training.
-*   Command: `python -m pipeline.features.extract_features --type cqt`
+### Step 10: Feature Extraction (Inline — Phase 9 of `run_pipeline.py`)
+**File:** `run_pipeline.py` (Phase 9, ~line 411)
+**Purpose:** The Translator — now runs automatically as the final phase of the main pipeline.
+*   Takes the exported WAV files directly.
+*   Converts them into **CQT Spectrograms** and **LFCC** features using `pipeline/features/cqt_extractor.py` and `pipeline/features/lfcc_extractor.py`.
+*   Saves as `.pt` (PyTorch tensors) in `<output_dir>/features/` ready for model training.
+*   **No separate command needed** — feature extraction runs automatically when you run `python run_pipeline.py`.
+*   For standalone re-extraction, use `scripts/preextract_features.py` or `scripts/preextract_ssl_features.py`.

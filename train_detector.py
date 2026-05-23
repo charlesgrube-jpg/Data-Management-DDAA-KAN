@@ -25,7 +25,8 @@ from tqdm import tqdm
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from pipeline.models import get_detector
+# pipeline.models is not implemented; model classes are defined inline in train_detector_csv.py
+# get_detector is not used in this file's inline training logic
 from pipeline.features.cqt_extractor import CQTExtractor
 
 

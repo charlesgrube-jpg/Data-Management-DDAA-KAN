@@ -32,8 +32,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-# CRITICAL: import from train_ode_v7d, NOT train_ode
-from train_ode_v7d import ODEDetector
+# CRITICAL: import ODEDetector from train_ode (v7d architecture is in scripts/train_ode.py)
+# train_ode_v7d does not exist as a separate file; ODEDetector is defined in train_ode.py
+from train_ode import ODEDetector
 
 
 # ── Dataset ────────────────────────────────────────────────────────────────────

@@ -19,10 +19,10 @@ from typing import Optional, List, Dict, Any
 
 from pipeline.config import load_config, Config
 from .loader import load_source_dataset
-from .preprocessor import preprocess_audio
-from .segmenter import segment_audio
-from .synthesizer import synthesize_audio
-from .effects import apply_effects_to_pair, select_quality_tier
+from pipeline.standardizer.preprocessor import preprocess_audio
+from pipeline.standardizer.segmenter import segment_audio
+from pipeline.synthesizer.synthesizer import synthesize_audio
+from pipeline.effects.effects import apply_effects_to_pair, select_quality_tier
 from .splitter import create_speaker_disjoint_splits
 from .validator import validate_dataset, generate_validation_report
 from .exporter import export_dataset, generate_dataset_card
@@ -112,7 +112,7 @@ def run_pipeline(config_path: str = "config.yaml") -> Dict[str, Any]:
                     )
                 else:
                     quality_tier = select_quality_tier(config)
-                    from .effects import apply_effects
+                    from pipeline.effects.effects import apply_effects
                     real_audio = apply_effects(chunk["audio"], config.audio.target_sr, quality_tier)
                     syn_audio = None
                 

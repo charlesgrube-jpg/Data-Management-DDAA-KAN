@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional, List, Tuple
 import random
 from abc import ABC, abstractmethod
 from pipeline.config import Config
-from .base import BaseSynthesizer
+from pipeline.synthesizer.base import BaseSynthesizer
 
 
 class TTSSynthesizer(BaseSynthesizer):

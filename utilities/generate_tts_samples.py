@@ -8,8 +8,8 @@ import sys
 sys.path.insert(0, '.')
 
 from pipeline.config import load_config
-from pipeline.mozilla_cv_loader import load_mozilla_cv
-from pipeline.gtts_synthesizer import synthesize_tts
+from pipeline.data_gen.mozilla_cv_loader import load_mozilla_cv
+from pipeline.synthesizer.gtts_synthesizer import synthesize_tts
 import soundfile as sf
 from pathlib import Path
 

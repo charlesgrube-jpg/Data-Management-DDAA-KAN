@@ -19,8 +19,11 @@ PASS = "[PASS]"
 WARN = "[WARN]"
 FAIL = "[FAIL]"
 
-# Latest output directory
-OUTPUT_DIR = Path("processed_dataset_20251223_171402")
+# Latest output directory — auto-detect from most recent processed_dataset_* folder,
+# or fall back to a configurable env var / command-line argument (see __main__ block).
+import glob as _glob
+_candidates = sorted(_glob.glob("processed_dataset_*"), reverse=True)
+OUTPUT_DIR = Path(os.environ.get("DDAA_OUTPUT_DIR", _candidates[0] if _candidates else "processed_dataset"))
 METADATA_FILE = OUTPUT_DIR / "metadata.csv"
 
 def phase1_input_validation():

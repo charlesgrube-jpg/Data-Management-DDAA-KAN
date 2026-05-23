@@ -24,7 +24,7 @@ cd /gpfs/gibbs/project/lawrence_wilen/ms4726/Data-Management-DDAA-KAN
 # v2 Phase-1 checkpoint (ode_best.pt) was trained with odeint/RK4 but the
 # weights are compatible — gradient method does not affect model state_dict.
 
-python scripts/train_ode_v6.py \
+python scripts/train_ode.py \
     --epochs 20 \
     --batch_size 24 \
     --freeze_epochs 5 \

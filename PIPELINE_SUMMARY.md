@@ -8,7 +8,8 @@ conda create -n ddaa-clean python=3.10 -y
 conda activate ddaa-clean
 pip install -r requirements.txt
 python run_pipeline.py
-python -m pipeline.features.extract_features --type cqt
+# Feature extraction now runs automatically as Phase 9 inside run_pipeline.py
+# No separate extract_features command needed.
 ```
 
 **Google Colab (Full Pipeline):**
@@ -40,8 +41,9 @@ python -m pipeline.features.extract_features --type cqt
 
 | File | Purpose |
 |------|---------|
-| `run_pipeline.py` | Generates audio dataset |
-| `pipeline/features/extract_features.py` | Extracts CQT/LFCC features |
+| `run_pipeline.py` | Generates audio dataset AND runs feature extraction (Phase 9 inline) |
+| `scripts/preextract_features.py` | Standalone CQT/LFCC feature extraction (re-run only) |
+| `scripts/preextract_ssl_features.py` | Standalone SSL feature extraction (re-run only) |
 | `config.yaml` | All settings |
 | `DDAA_Pipeline_Colab.ipynb` | One-click Colab notebook |
 
