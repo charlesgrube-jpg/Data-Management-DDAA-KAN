@@ -33,22 +33,22 @@ def load_detector(model_name, checkpoint_path, device):
     """
     model = None
     
-    # 1. Try importing from specific files (if synced)
+    # 1. Try importing from pipeline.models
     try:
         if model_name == "pinn":
-            from pinn_detector import PINNDetector
+            from pipeline.models.pinn_detector import PINNDetector
             model = PINNDetector()
         elif model_name == "kan":
-            from kan_detector import KANDetector
+            from pipeline.models.kan_detector import KANDetector
             model = KANDetector()
         elif model_name == "transformer":
-            from transformer_detector import TransformerDetector
+            from pipeline.models.transformer_detector import TransformerDetector
             model = TransformerDetector()
         elif model_name == "neural_ode":
-            from neural_ode_detector import NeuralODEDetector
+            from pipeline.models.neural_ode_detector import NeuralODEDetector
             model = NeuralODEDetector()
     except ImportError as e:
-        print(f"[Warn] Could not import from {model_name}_detector.py: {e}")
+        print(f"[Warn] Could not import from pipeline.models: {e}")
         print("[Info] Attempting fallback to scripts.train_detector_csv definitions...")
 
     # 2. Fallback: Import from train_detector_csv if not found

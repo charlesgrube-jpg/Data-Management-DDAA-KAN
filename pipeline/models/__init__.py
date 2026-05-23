@@ -10,7 +10,6 @@ from .kan_detector import KANDetector
 from .neural_ode_detector import NeuralODEDetector
 from .pinn_detector import PINNDetector
 
-# Import detectors (will be added as they are implemented)
 __all__ = [
     "BaseDetector",
     "TransformerDetector",
@@ -20,20 +19,19 @@ __all__ = [
     "get_detector",
 ]
 
-# Lazy imports to avoid import errors if dependencies are missing
+
 def get_detector(name: str, **kwargs):
     """
-    Factory function to get detector by name.
-    
+    Factory function to get a detector by name.
+
     Args:
         name: One of "transformer", "kan", "neural_ode", "pinn"
-        **kwargs: Model-specific arguments
-        
+        **kwargs: Model-specific keyword arguments
+
     Returns:
         Detector instance
     """
     name = name.lower()
-    
     if name == "transformer":
         from .transformer_detector import TransformerDetector
         return TransformerDetector(**kwargs)
@@ -47,5 +45,6 @@ def get_detector(name: str, **kwargs):
         from .pinn_detector import PINNDetector
         return PINNDetector(**kwargs)
     else:
-        raise ValueError(f"Unknown detector: {name}. "
-                        f"Choose from: transformer, kan, neural_ode, pinn")
+        raise ValueError(
+            f"Unknown detector: {name}. Choose from: transformer, kan, neural_ode, pinn"
+        )

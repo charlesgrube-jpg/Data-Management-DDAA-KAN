@@ -47,60 +47,63 @@ def load_mozilla_cv(
     all_matched_tsv = dataset_path / "all_matched_clips.tsv"
     matched_tsv = dataset_path / f"matched_{split}.tsv"
     
+    # Get available clips (support both mp3 and wav) early
+    available_clips = set(f.name for f in clips_dir.glob("*.mp3"))
+    available_clips.update(f.name for f in clips_dir.glob("*.wav"))
+    # Also add with clips/ prefix for matching TSV entries
+    available_clips_with_prefix = set(f"clips/{name}" for name in available_clips)
+    available_clips.update(available_clips_with_prefix)
+    print(f"[Mozilla CV Loader] Available clips in directory: {len(available_clips) // 2}")
+
+    if len(available_clips) == 0:
+        print("[Mozilla CV Loader] WARNING: No clips found in clips/ directory")
+        return
+    
     if all_matched_tsv.exists():
         print(f"[Mozilla CV Loader] Using all_matched_clips.tsv")
         df = pd.read_csv(all_matched_tsv, sep='\t')
     elif matched_tsv.exists():
         print(f"[Mozilla CV Loader] Using matched TSV: {matched_tsv}")
         df = pd.read_csv(matched_tsv, sep='\t')
-    elif tsv_file.exists():
-        # Load metadata and filter by available clips
-        print(f"[Mozilla CV Loader] Loading {split}.tsv and filtering by available clips...")
+    else:
+        # AGGRESSIVE MODE: Scan ALL standard TSVs to find as many clips as possible
+        print(f"[Mozilla CV Loader] Scanning all TSVs to find matches for {len(available_clips)} available clips...")
         
-        # Get available clips (support both mp3 and wav)
-        available_clips = set(f.name for f in clips_dir.glob("*.mp3"))
-        available_clips.update(f.name for f in clips_dir.glob("*.wav"))
-        # Also add with clips/ prefix for matching TSV entries
-        available_clips_with_prefix = set(f"clips/{name}" for name in available_clips)
-        available_clips.update(available_clips_with_prefix)
-        print(f"[Mozilla CV Loader] Available clips: {len(available_clips) // 2}")
-        
-        if len(available_clips) == 0:
-            print("[Mozilla CV Loader] WARNING: No clips found in clips/ directory")
-            return
-        
-        # Scan TSV in chunks to find matching entries
         matches = []
-        for chunk in pd.read_csv(tsv_file, sep='\t', chunksize=100000):
-            matched = chunk[chunk['path'].isin(available_clips)]
-            if len(matched) > 0:
-                matches.append(matched)
+        seen_paths = set()
         
+        # Priority order: requested split first, then others
+        splits_to_check = [split] + [s for s in ["train", "validated", "test", "dev", "other"] if s != split]
+        
+        for check_split in splits_to_check:
+            check_tsv = dataset_path / f"{check_split}.tsv"
+            if not check_tsv.exists():
+                continue
+                
+            print(f"  - Scanning {check_split}.tsv...")
+            try:
+                for chunk in pd.read_csv(check_tsv, sep='\t', chunksize=100000):
+                    # Filter for files we have
+                    matched = chunk[chunk['path'].isin(available_clips)]
+                    
+                    # Remove any we've already seen (duplicates across TSVs)
+                    if not matched.empty:
+                        original_len = len(matched)
+                        matched = matched[~matched['path'].isin(seen_paths)]
+                        
+                        if not matched.empty:
+                            seen_paths.update(matched['path'])
+                            matches.append(matched)
+                            # print(f"    Found {len(matched)} new matches (unique)")
+            except Exception as e:
+                print(f"    Error reading {check_split}.tsv: {e}")
+
         if matches:
             df = pd.concat(matches)
-            print(f"[Mozilla CV Loader] Found {len(df)} entries with available clips")
-
+            print(f"[Mozilla CV Loader] AGGREGATED TOTAL: {len(df)} unique entries from all splits")
         else:
-            print(f"[Mozilla CV Loader] No clips found in {split}.tsv, trying other TSVs...")
-            # Try other splits
-            for other_split in ["validated", "test", "dev", "other"]:
-                other_tsv = dataset_path / f"{other_split}.tsv"
-                if other_tsv.exists() and other_split != split:
-                    for chunk in pd.read_csv(other_tsv, sep='\t', chunksize=100000):
-                        matched = chunk[chunk['path'].isin(available_clips)]
-                        if len(matched) > 0:
-                            matches.append(matched)
-                    if matches:
-                        print(f"[Mozilla CV Loader] Found clips in {other_split}.tsv")
-                        break
-            
-            if matches:
-                df = pd.concat(matches)
-            else:
-                print("[Mozilla CV Loader] ERROR: No matching clips found in any TSV")
-                return
-    else:
-        raise FileNotFoundError(f"TSV file not found: {tsv_file}")
+            print("[Mozilla CV Loader] ERROR: No matching clips found in any TSV")
+            return
     
     print(f"[Mozilla CV Loader] Total entries: {len(df)}")
     
@@ -162,17 +165,14 @@ def load_mozilla_cv(
              pass # Failed to get size, ignore
         
         try:
-            # Load audio
-            if use_librosa:
-                audio, sr = librosa.load(str(clip_path), sr=config.audio.target_sr)
-            else:
-                # Fallback: just skip if no audio loader
-                skipped_count += 1
-                continue
+            # Lazy Loading: Do NOT load audio here to save RAM
+            # audio, sr = librosa.load(str(clip_path), sr=config.audio.target_sr)
+            audio = None
+            sr = config.audio.target_sr
             
             # Build sample dict
             sample = {
-                "audio": audio,
+                "audio": audio, # Lazy loaded later
                 "sample_rate": sr,
                 "source_idx": idx,
                 "speaker_id": str(row.get('client_id', f'speaker_{idx}')),
@@ -191,11 +191,11 @@ def load_mozilla_cv(
             yield sample
             
         except Exception as e:
-            print(f"[Mozilla CV Loader] Error loading {clip_filename}: {e}")
+            print(f"[Mozilla CV Loader] Error preparing {clip_filename}: {e}")
             skipped_count += 1
             continue
     
-    print(f"[Mozilla CV Loader] Loaded: {loaded_count}, Skipped: {skipped_count}, Total Size: {total_bytes_loaded / 1024 / 1024:.2f} MB")
+    print(f"[Mozilla CV Loader] Prepared: {loaded_count}, Skipped: {skipped_count}, Total Size: {total_bytes_loaded / 1024 / 1024:.2f} MB")
 
 
 def get_available_clips(dataset_path: str) -> list:
