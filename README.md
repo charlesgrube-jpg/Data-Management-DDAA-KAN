@@ -15,11 +15,21 @@ This repository contains:
 ```
 .
 ├── run_pipeline.py             # Main entry point: dataset generation
-├── validate_pipeline.py        # Validate pipeline output quality
 ├── run_attack_local.py         # Run adversarial attacks locally
-├── config.yaml                 # Pipeline configuration (sources, synthesis, splits)
 ├── requirements.txt            # Core dependencies
-├── requirements_colab.txt      # Full dependencies (GPU/Linux, includes RVC)
+│
+├── config/                     # Configuration files
+│   ├── config.yaml             # Pipeline configuration (sources, synthesis, splits)
+│   └── requirements_colab.txt  # Full dependencies (GPU/Linux, includes RVC)
+│
+├── docs/                       # Documentation and changelogs
+│   ├── CHANGELOG.md
+│   ├── CHANGELOG_HF.md
+│   ├── CONDA_SETUP.md
+│   ├── PIPELINE_FLOW.md
+│   ├── PIPELINE_SUMMARY.md
+│   ├── SUMMARY_HF_INTEGRATION.md
+│   └── notebooks/              # Colab/Kaggle notebook versions
 │
 ├── pipeline/                   # Dataset generation pipeline (importable package)
 │   ├── config.py               # Config loading (OmegaConf-based)
@@ -61,6 +71,7 @@ This repository contains:
 │   ├── train_kan.py            # KAN detector (B-spline, grid=5 order=5)
 │   ├── train_pinn.py           # PINN detector (physics regularization lambda=0.05)
 │   ├── train_ode.py            # NeuralODE detector
+│   ├── validate_pipeline.py    # Validate pipeline output quality
 │   ├── evaluate_robustness.py  # Adversarial robustness evaluation
 │   ├── run_interpretability.py # Interpretability analysis (attention, splines, ODE traj)
 │   ├── regen_figs_correct.py   # Regenerate paper figures from scores cache
@@ -111,7 +122,7 @@ pip install -r requirements.txt
 For full pipeline including RVC and GPU features (Colab/Linux):
 
 ```bash
-pip install -r requirements_colab.txt
+pip install -r config/requirements_colab.txt
 ```
 
 ### Verify
@@ -136,7 +147,7 @@ This downloads a subset of Mozilla Common Voice 24.0 (English) to `mozilla_cv_da
 
 ### 2. Configure the pipeline
 
-Edit `config.yaml` to set:
+Edit `config/config.yaml` to set:
 - `source.max_samples`: how many audio clips to process
 - `synthesis.enable_vc`: enable RVC voice conversion (Linux/Docker only)
 - `output.base_dir`: output directory
@@ -167,7 +178,7 @@ python run_pipeline.py --chunk-id 0 --num-chunks 8
 ### 4. Validate output
 
 ```bash
-python validate_pipeline.py
+python scripts/validate_pipeline.py
 ```
 
 ---
