@@ -230,7 +230,7 @@ python scripts/train_ode.py \
     --output_dir models_ode_v7
 ```
 
-### SLURM (Yale HPC)
+### SLURM (HPC)
 
 ```bash
 sbatch scripts/submit_train.sh       # Transformer
